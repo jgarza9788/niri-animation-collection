@@ -1,5 +1,5 @@
 /*
-Shader: glide
+Title: glide
 Authors: Justin Garza <JGarza9788@gmail.com>
 Desc: a softer Apple-like glide preset for niri.
 Demo: ./demos/glide.gif
@@ -11,7 +11,7 @@ Notes:
 
 animations {
     // Uncomment while tuning.
-    // slowdown 1.25
+    slowdown 1.5
 
     workspace-switch {
         // Smooth, composed, no bounce.
@@ -27,8 +27,8 @@ animations {
             vec4 open_color(vec3 coords_geo, vec3 size_geo) {
                 float p = niri_clamped_progress;
 
-                // Slight right-to-left settle.
-                float slide_px = (1.0 - p) * 28.0;
+                // Slight up-to-down settle.
+                float slide_px = (1.0 - p) * 60.0;
                 float slide_geo = slide_px / max(size_geo.x, 1.0);
 
                 // Very subtle scale-up into place.
@@ -39,7 +39,7 @@ animations {
                 uv /= scale;
                 uv += vec2(0.5, 0.5);
 
-                uv.x -= slide_geo;
+                uv.y -= slide_geo;
 
                 vec3 coords_tex = niri_geo_to_tex * vec3(uv, 1.0);
                 vec4 color = texture2D(niri_tex, coords_tex.st);
@@ -62,8 +62,8 @@ animations {
                 float p = niri_clamped_progress;
                 float inv = 1.0 - p;
 
-                // Slight leftward departure.
-                float slide_px = p * 22.0;
+                // Slight downward departure.
+                float slide_px = p * 40.0;
                 float slide_geo = slide_px / max(size_geo.x, 1.0);
 
                 // Tiny scale-down on exit.
@@ -74,7 +74,7 @@ animations {
                 uv /= scale;
                 uv += vec2(0.5, 0.5);
 
-                uv.x += slide_geo;
+                uv.y -= slide_geo;
 
                 vec3 coords_tex = niri_geo_to_tex * vec3(uv, 1.0);
                 vec4 color = texture2D(niri_tex, coords_tex.st);
@@ -102,7 +102,7 @@ animations {
 
         custom-shader r"
             vec4 resize_color(vec3 coords_curr_geo, vec3 size_curr_geo) {
-                // Show the "next" texture, but with a very mild softening
+                // Show the next texture, but with a very mild softening
                 // toward the edges during motion for a less harsh resize feel.
                 vec3 coords_tex_next = niri_geo_to_tex_next * coords_curr_geo;
                 vec4 color = texture2D(niri_tex_next, coords_tex_next.st);

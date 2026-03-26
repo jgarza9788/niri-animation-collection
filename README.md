@@ -8,9 +8,13 @@ A collection of animations and shader presets for niri.
 `~/.config/niri/animations/<animation-name>`
 
 - Edit your niri configuration to point to the animation (see the niri wiki for details):
-* Example
+* Example1
 ```
-include animations/<animation-name>.kdl
+include "animations/<animation-name>.kdl"
+```
+* Example2 - for more advanced users
+```
+include "niri-animation-collection/animations/glide.kdl"
 ```
 
 ## Contribute
@@ -28,6 +32,9 @@ Thank you for contributing! Steps:
 - Include any metadata or example config needed for niri to load the animation.
 - Provide attribution for any third-party assets.
 
+## Showcase
+
+[Showcase](./showcase.md)
 
 ## References
 

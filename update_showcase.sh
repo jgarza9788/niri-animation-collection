@@ -22,6 +22,11 @@ if [ ${#files[@]} -eq 0 ]; then
 	exit 0
 fi
 
+
+# for file in "${files[@]}"; do
+# 	echo "$file"
+# done
+
 for file in "${files[@]}"; do
 	base=$(basename "$file")
 	name="${base%.*}"
@@ -29,44 +34,28 @@ for file in "${files[@]}"; do
 	header=$(sed -n '1,50p' "$file")
 
 	title=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /title:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
-	description=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /description:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
-	giffield=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /gif:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
+	authors=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /authors:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
+	desc=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /Desc:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
+	gifpath=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /Demo:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
+
+	echo -e "$title\n$authors\\n$desc\\n$gifpath"
 
 	[ -z "$title" ] && title="$name"
 
-	echo "## $title" >> "$OUT_FILE"
-	if [ -n "$description" ]; then
-		echo "" >> "$OUT_FILE"
-		echo "$description" >> "$OUT_FILE"
+	echo "## $title  " >> "$OUT_FILE"
+	echo "* Authors: $authors  " >> "$OUT_FILE"
+	if [ -n "$desc" ]; then
+		echo "* Desc: $desc  " >> "$OUT_FILE"
 	fi
 
-	# resolve gif path: prefer explicit header, then docs/gifs/<name>.*, then demos/<name>.gif
-	gifpath=""
-	if [ -n "$giffield" ]; then
-		if [ -f "$giffield" ]; then
-			gifpath="$giffield"
-		elif [ -f "docs/gifs/$giffield" ]; then
-			gifpath="docs/gifs/$giffield"
-		fi
-	fi
-
-	if [ -z "$gifpath" ]; then
-		if [ -f "docs/gifs/${name}.gif" ]; then
-			gifpath="docs/gifs/${name}.gif"
-		elif [ -f "docs/gifs/${name}.png" ]; then
-			gifpath="docs/gifs/${name}.png"
-		elif [ -f "demos/${name}.gif" ]; then
-			gifpath="demos/${name}.gif"
-		fi
-	fi
-
-	echo "" >> "$OUT_FILE"
 	if [ -n "$gifpath" ]; then
-		echo "![${title}](${gifpath})" >> "$OUT_FILE"
+		echo "![${title}](${gifpath})  " >> "$OUT_FILE"
 	else
 		echo "_No demo image found for ${title}_" >> "$OUT_FILE"
 	fi
 
+	echo "" >> "$OUT_FILE"
+	echo "---" >> "$OUT_FILE"
 	echo "" >> "$OUT_FILE"
 done
 
