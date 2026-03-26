@@ -8,7 +8,6 @@ A collection of animations and shader presets for niri.
 `~/.config/niri/animations/<animation-name>`
 
 - Edit your niri configuration to point to the animation (see the niri wiki for details):
-
 * Example
 ```
 include animations/<animation-name>.kdl

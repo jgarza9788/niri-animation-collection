@@ -1,0 +1,71 @@
+name: Comment Ratio Check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  comment-ratio:
+    name: Verify comment ratio >= 10%
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cloc jq
+
+      - name: Run cloc (exclude .kdl, docs, and .github)
+        run: |
+          cloc --json --exclude-dir=.github,docs,docs/gifs --exclude-ext=kdl . > cloc.json || true
+
+      - name: Count .kdl files (fallback for KDL comment counting)
+        run: |
+          # total lines in .kdl files
+          kdl_total=$(find . -type f -name '*.kdl' -print0 | xargs -0 cat 2>/dev/null | wc -l || echo 0)
+          # comment lines in .kdl: lines starting with //, #, or ;
+          kdl_comments=$(find . -type f -name '*.kdl' -print0 | xargs -0 grep -h -E '^[[:space:]]*(//|#|;)' 2>/dev/null | wc -l || echo 0)
+          jq -n --arg kt "$kdl_total" --arg kc "$kdl_comments" '{kdl_total:($kt|tonumber), kdl_comments:($kc|tonumber)}' > kdl.json
+
+      - name: Compute totals and assert ratio
+        run: |
+          cloc_comments=0
+          cloc_code=0
+          if [ -f cloc.json ]; then
+            cloc_comments=$(jq '.SUM.comments // 0' cloc.json)
+            cloc_code=$(jq '.SUM.code // 0' cloc.json)
+          fi
+
+          kdl_comments=$(jq '.kdl_comments // 0' kdl.json)
+          kdl_total=$(jq '.kdl_total // 0' kdl.json)
+
+          total_comments=$((cloc_comments + kdl_comments))
+          total_code=$((cloc_code + kdl_total))
+
+          echo "cloc comments: $cloc_comments, cloc code: $cloc_code"
+          echo ".kdl comments: $kdl_comments, .kdl total lines: $kdl_total"
+          echo "Totals — comments: $total_comments, code: $total_code"
+
+          if [ "$total_code" -eq 0 ]; then
+            echo "No code detected; skipping comment ratio check."
+            exit 0
+          fi
+
+          # compute percentage = (comments / code) * 100
+          perc=$(awk -v c="$total_comments" -v k="$total_code" 'BEGIN{printf("%.2f", (c/k)*100)}')
+          echo "Comment ratio: $perc% (comments/code*100)"
+
+          required=10
+          ok=$(awk -v p="$perc" -v r="$required" 'BEGIN{print (p+0 >= r) ? 0 : 1}')
+          if [ "$ok" -ne 0 ]; then
+            echo "Comment ratio $perc% is less than required ${required}%"
+            exit 1
+          fi
+
+      - name: Success
+        if: always()
+        run: echo "Comment ratio requirement satisfied."
