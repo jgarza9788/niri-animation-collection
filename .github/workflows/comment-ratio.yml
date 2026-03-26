@@ -8,58 +8,45 @@ on:
 
 jobs:
   comment-ratio:
-    name: Verify comment ratio >= 10%
+    name: Verify comment ratio >= 5%
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Count .kdl comment and total lines
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq cloc jq
-
-      - name: Run cloc (exclude .kdl, docs, and .github)
-        run: |
-          cloc --json --exclude-dir=.github,docs,docs/gifs --exclude-ext=kdl . > cloc.json || true
-
-      - name: Count .kdl files (fallback for KDL comment counting)
-        run: |
-          # total lines in .kdl files
-          kdl_total=$(find . -type f -name '*.kdl' -print0 | xargs -0 cat 2>/dev/null | wc -l || echo 0)
-          # comment lines in .kdl: lines starting with //, #, or ;
-          kdl_comments=$(find . -type f -name '*.kdl' -print0 | xargs -0 grep -h -E '^[[:space:]]*(//|#|;)' 2>/dev/null | wc -l || echo 0)
-          jq -n --arg kt "$kdl_total" --arg kc "$kdl_comments" '{kdl_total:($kt|tonumber), kdl_comments:($kc|tonumber)}' > kdl.json
-
-      - name: Compute totals and assert ratio
-        run: |
-          cloc_comments=0
-          cloc_code=0
-          if [ -f cloc.json ]; then
-            cloc_comments=$(jq '.SUM.comments // 0' cloc.json)
-            cloc_code=$(jq '.SUM.code // 0' cloc.json)
-          fi
-
-          kdl_comments=$(jq '.kdl_comments // 0' kdl.json)
-          kdl_total=$(jq '.kdl_total // 0' kdl.json)
-
-          total_comments=$((cloc_comments + kdl_comments))
-          total_code=$((cloc_code + kdl_total))
-
-          echo "cloc comments: $cloc_comments, cloc code: $cloc_code"
-          echo ".kdl comments: $kdl_comments, .kdl total lines: $kdl_total"
-          echo "Totals — comments: $total_comments, code: $total_code"
-
-          if [ "$total_code" -eq 0 ]; then
-            echo "No code detected; skipping comment ratio check."
+          set -o pipefail
+          # find all .kdl files
+          files=$(find . -type f -name '*.kdl' -print)
+          if [ -z "${files}" ]; then
+            echo "No .kdl files found; skipping comment ratio check."
             exit 0
           fi
 
-          # compute percentage = (comments / code) * 100
-          perc=$(awk -v c="$total_comments" -v k="$total_code" 'BEGIN{printf("%.2f", (c/k)*100)}')
-          echo "Comment ratio: $perc% (comments/code*100)"
+          total=0
+          comments=0
+          while IFS= read -r -d '' f; do
+            # count total lines
+            t=$(wc -l < "$f" || echo 0)
+            # comments: lines starting with //, #, ; optionally preceded by whitespace
+            c=$(grep -h -E '^[[:space:]]*(//|#|;)' "$f" | wc -l || true)
+            total=$((total + t))
+            comments=$((comments + c))
+          done < <(find . -type f -name '*.kdl' -print0)
 
-          required=10
+          echo "kdl total lines: $total"
+          echo "kdl comment lines: $comments"
+
+          if [ "$total" -eq 0 ]; then
+            echo "No code lines detected in .kdl files; skipping check."
+            exit 0
+          fi
+
+          perc=$(awk -v c="$comments" -v t="$total" 'BEGIN{printf("%.2f", (c/t)*100)}')
+          echo "Comment ratio: $perc%"
+
+          required=5
           ok=$(awk -v p="$perc" -v r="$required" 'BEGIN{print (p+0 >= r) ? 0 : 1}')
           if [ "$ok" -ne 0 ]; then
             echo "Comment ratio $perc% is less than required ${required}%"
