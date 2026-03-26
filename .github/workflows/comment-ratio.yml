@@ -1,0 +1,56 @@
+name: Comment Ratio Check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  comment-ratio:
+    name: Verify comment ratio >= 5%
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Count .kdl comment and total lines in `animations/`
+        run: |
+          set -o pipefail
+          # find .kdl files under animations/
+          mapfile -d '' -t files < <(find animations -type f -name '*.kdl' -print0 2>/dev/null || true)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No .kdl files found in animations/; skipping comment ratio check."
+            exit 0
+          fi
+
+          total=0
+          comments=0
+          for f in "${files[@]}"; do
+            t=$(wc -l < "$f" || echo 0)
+            c=$(grep -h -E '^[[:space:]]*(//|#|;)' "$f" | wc -l || true)
+            total=$((total + t))
+            comments=$((comments + c))
+          done
+
+          echo "kdl total lines (animations): $total"
+          echo "kdl comment lines (animations): $comments"
+
+          if [ "$total" -eq 0 ]; then
+            echo "No code lines detected in animations/*.kdl; skipping check."
+            exit 0
+          fi
+
+          perc=$(awk -v c="$comments" -v t="$total" 'BEGIN{printf("%.2f", (c/t)*100)}')
+          echo "Comment ratio: $perc%"
+
+          required=5
+          ok=$(awk -v p="$perc" -v r="$required" 'BEGIN{print (p+0 >= r) ? 0 : 1}')
+          if [ "$ok" -ne 0 ]; then
+            echo "Comment ratio $perc% is less than required ${required}%"
+            exit 1
+          fi
+
+      - name: Success
+        if: always()
+        run: echo "Comment ratio requirement satisfied."
