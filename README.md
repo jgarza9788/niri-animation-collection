@@ -1,6 +1,9 @@
 # niri-animation-collection
 A collection of animations and shader presets for niri.
 
+## Showcase
+
+[Showcase](./showcase.md)
 
 ## Install
 
@@ -8,14 +11,14 @@ A collection of animations and shader presets for niri.
 `~/.config/niri/animations/<animation-name>`
 
 - Edit your niri configuration to point to the animation (see the niri wiki for details):
-* Example1
-```
-include "animations/<animation-name>.kdl"
-```
-* Example2 - for more advanced users
-```
-include "niri-animation-collection/animations/glide.kdl"
-```
+    * Example1
+    ```
+    include "animations/<animation-name>.kdl"
+    ```
+    * Example2 - for more advanced users
+    ```
+    include "niri-animation-collection/animations/glide.kdl"
+    ```
 
 ## Contribute
 
@@ -26,15 +29,13 @@ Thank you for contributing! Steps:
 3. Add a gif to `demos/` folder.
 4. Run `./update_showcase.sh`
 5. Open a pull request with a short description and a screenshot or GIF.
+    * [EZGIF.com](https://ezgif.com/) can help you trim/cut and convert a video
 
 ### Guidelines:
 - Keep each animation self-contained in its folder.
 - Include any metadata or example config needed for niri to load the animation.
 - Provide attribution for any third-party assets.
 
-## Showcase
-
-[Showcase](./showcase.md)
 
 ## References
 
