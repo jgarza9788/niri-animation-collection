@@ -1,0 +1,144 @@
+/*
+Shader: glide
+Authors: Justin Garza <JGarza9788@gmail.com>
+Desc: a softer Apple-like glide preset for niri.
+Demo: ./demos/glide.gif
+Notes:
+- Smooth, polished, low-bounce motion.
+- Open is slightly more luxurious than close.
+- Uses custom shaders where niri supports them.
+*/
+
+animations {
+    // Uncomment while tuning.
+    // slowdown 1.25
+
+    workspace-switch {
+        // Smooth, composed, no bounce.
+        spring damping-ratio=1.0 stiffness=760 epsilon=0.0001
+    }
+
+    window-open {
+        duration-ms 260
+        // close to a polished macOS-style ease-out feel
+        curve "cubic-bezier" 0.22 1.0 0.36 1.0
+
+        custom-shader r"
+            vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+                float p = niri_clamped_progress;
+
+                // Slight right-to-left settle.
+                float slide_px = (1.0 - p) * 28.0;
+                float slide_geo = slide_px / max(size_geo.x, 1.0);
+
+                // Very subtle scale-up into place.
+                float scale = 0.985 + 0.015 * p;
+
+                vec2 uv = coords_geo.xy;
+                uv -= vec2(0.5, 0.5);
+                uv /= scale;
+                uv += vec2(0.5, 0.5);
+
+                uv.x -= slide_geo;
+
+                vec3 coords_tex = niri_geo_to_tex * vec3(uv, 1.0);
+                vec4 color = texture2D(niri_tex, coords_tex.st);
+
+                // Gentle fade-in.
+                color *= p;
+
+                return color;
+            }
+        "
+    }
+
+    window-close {
+        duration-ms 180
+        // quick, clean exit
+        curve "cubic-bezier" 0.32 0.0 0.67 0.0
+
+        custom-shader r"
+            vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+                float p = niri_clamped_progress;
+                float inv = 1.0 - p;
+
+                // Slight leftward departure.
+                float slide_px = p * 22.0;
+                float slide_geo = slide_px / max(size_geo.x, 1.0);
+
+                // Tiny scale-down on exit.
+                float scale = 1.0 - 0.012 * p;
+
+                vec2 uv = coords_geo.xy;
+                uv -= vec2(0.5, 0.5);
+                uv /= scale;
+                uv += vec2(0.5, 0.5);
+
+                uv.x += slide_geo;
+
+                vec3 coords_tex = niri_geo_to_tex * vec3(uv, 1.0);
+                vec4 color = texture2D(niri_tex, coords_tex.st);
+
+                color *= inv;
+                return color;
+            }
+        "
+    }
+
+    horizontal-view-movement {
+        // Main "camera glide" for scrollable movement.
+        spring damping-ratio=1.0 stiffness=640 epsilon=0.0001
+    }
+
+    window-movement {
+        // Individual windows shift with a slightly tighter response
+        // than the camera, so it feels organized.
+        spring damping-ratio=1.0 stiffness=700 epsilon=0.0001
+    }
+
+    window-resize {
+        // Resizes should feel soft but controlled.
+        spring damping-ratio=1.0 stiffness=720 epsilon=0.0001
+
+        custom-shader r"
+            vec4 resize_color(vec3 coords_curr_geo, vec3 size_curr_geo) {
+                // Show the "next" texture, but with a very mild softening
+                // toward the edges during motion for a less harsh resize feel.
+                vec3 coords_tex_next = niri_geo_to_tex_next * coords_curr_geo;
+                vec4 color = texture2D(niri_tex_next, coords_tex_next.st);
+
+                vec2 uv = coords_curr_geo.xy;
+                float edge =
+                    min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+
+                float vignette = smoothstep(0.0, 0.06, edge);
+                color.rgb *= mix(0.985, 1.0, vignette);
+
+                return color;
+            }
+        "
+    }
+
+    config-notification-open-close {
+        // Less playful, more refined than the default underdamped feel.
+        spring damping-ratio=1.0 stiffness=820 epsilon=0.001
+    }
+
+    exit-confirmation-open-close {
+        spring damping-ratio=1.0 stiffness=560 epsilon=0.01
+    }
+
+    screenshot-ui-open {
+        duration-ms 220
+        curve "cubic-bezier" 0.22 1.0 0.36 1.0
+    }
+
+    overview-open-close {
+        // Overview should feel smooth and premium, not springy/bouncy.
+        spring damping-ratio=1.0 stiffness=620 epsilon=0.0001
+    }
+
+    recent-windows-close {
+        spring damping-ratio=1.0 stiffness=680 epsilon=0.001
+    }
+}
