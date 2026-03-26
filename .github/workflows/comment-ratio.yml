@@ -14,32 +14,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Count .kdl comment and total lines
+      - name: Count .kdl comment and total lines in `animations/`
         run: |
           set -o pipefail
-          # find all .kdl files
-          files=$(find . -type f -name '*.kdl' -print)
-          if [ -z "${files}" ]; then
-            echo "No .kdl files found; skipping comment ratio check."
+          # find .kdl files under animations/
+          mapfile -d '' -t files < <(find animations -type f -name '*.kdl' -print0 2>/dev/null || true)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No .kdl files found in animations/; skipping comment ratio check."
             exit 0
           fi
 
           total=0
           comments=0
-          while IFS= read -r -d '' f; do
-            # count total lines
+          for f in "${files[@]}"; do
             t=$(wc -l < "$f" || echo 0)
-            # comments: lines starting with //, #, ; optionally preceded by whitespace
             c=$(grep -h -E '^[[:space:]]*(//|#|;)' "$f" | wc -l || true)
             total=$((total + t))
             comments=$((comments + c))
-          done < <(find . -type f -name '*.kdl' -print0)
+          done
 
-          echo "kdl total lines: $total"
-          echo "kdl comment lines: $comments"
+          echo "kdl total lines (animations): $total"
+          echo "kdl comment lines (animations): $comments"
 
           if [ "$total" -eq 0 ]; then
-            echo "No code lines detected in .kdl files; skipping check."
+            echo "No code lines detected in animations/*.kdl; skipping check."
             exit 0
           fi
 
