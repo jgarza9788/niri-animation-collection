@@ -1,0 +1,173 @@
+/*
+Title: Dither-glitch
+Authors: Joe Hsu<jhsu.x1@gmail.com>
+Desc: Dither fade in, glitch out
+Demo: ./demos/dither-glitch.gif
+*/
+
+
+animations {
+    window-open {
+        duration-ms 380
+        curve "linear"
+
+        custom-shader r"
+            float hash(vec2 p) {
+                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+            }
+
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + vec2(1.0, 0.0));
+                float c = hash(i + vec2(0.0, 1.0));
+                float d = hash(i + vec2(1.0, 1.0));
+
+                vec2 u = f * f * (3.0 - 2.0 * f);
+
+                return mix(a, b, u.x) +
+                       (c - a) * u.y * (1.0 - u.x) +
+                       (d - b) * u.y * u.x;
+            }
+
+            vec4 sample_rgb_split(vec2 uv, float amt) {
+                vec2 off = vec2(amt, 0.0);
+                float r = texture2D(niri_tex, uv + off).r;
+                float g = texture2D(niri_tex, uv).g;
+                float b = texture2D(niri_tex, uv - off).b;
+                float a = texture2D(niri_tex, uv).a;
+                return vec4(r, g, b, a);
+            }
+
+            vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+                if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+                    coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+                    return vec4(0.0);
+                }
+
+                float p = niri_clamped_progress;
+                vec2 uv = coords_geo.xy;
+
+                vec3 coords_tex = niri_geo_to_tex * coords_geo;
+                vec2 tex_uv = coords_tex.st;
+
+                // Slight unstable horizontal glitch early in the animation
+                float early = 1.0 - smoothstep(0.0, 0.35, p);
+                float band = step(0.72, noise(vec2(floor(uv.y * 42.0), floor(p * 30.0))));
+                float tear = (noise(vec2(floor(uv.y * 90.0), floor(p * 50.0))) - 0.5)
+                           * 0.045 * early * band;
+
+                tex_uv.x += tear;
+
+                // Tiny RGB split that settles as the window appears
+                float rgb_amt = 0.008 * early;
+                vec4 color = sample_rgb_split(tex_uv, rgb_amt);
+
+                // Ordered-ish dithering / noise threshold reveal
+                float pix = floor(uv.x * 120.0) + floor(uv.y * 120.0) * 131.0;
+                float dither = fract(sin(pix * 91.3458) * 47453.5453);
+
+                // Mix in animated noise so it feels glitchy rather than clean ordered dithering
+                float n = noise(uv * 16.0 + vec2(0.0, p * 18.0));
+                float threshold = mix(dither, n, 0.45);
+
+                // Reveal nonlinearly so it 'snaps in' more at the end
+                float reveal = smoothstep(0.0, 1.0, pow(p, 1.35));
+                float alpha_mask = step(threshold, reveal);
+
+                // Soften the harsh on/off just a little
+                float soft = smoothstep(reveal - 0.10, reveal + 0.02, threshold);
+                float alpha = mix(alpha_mask, 1.0 - soft, 0.35);
+
+                // Scanline shimmer early on
+                float scan = sin(uv.y * 240.0 + p * 35.0) * 0.5 + 0.5;
+                float scan_amt = 0.10 * early * scan;
+
+                color.rgb += scan_amt;
+                color.rgb *= 0.92 + 0.08 * smoothstep(0.0, 1.0, p);
+
+                return vec4(color.rgb, color.a * alpha);
+            }
+        "
+    }
+
+    window-close {
+        duration-ms 140
+        curve "linear"
+
+        custom-shader r"
+            float hash(vec2 p) {
+                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+            }
+
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+
+                float a = hash(i);
+                float b = hash(i + vec2(1.0, 0.0));
+                float c = hash(i + vec2(0.0, 1.0));
+                float d = hash(i + vec2(1.0, 1.0));
+
+                vec2 u = f * f * (3.0 - 2.0 * f);
+
+                return mix(a, b, u.x) +
+                       (c - a) * u.y * (1.0 - u.x) +
+                       (d - b) * u.y * u.x;
+            }
+
+            vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+                if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+                    coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+                    return vec4(0.0);
+                }
+
+                float p = niri_clamped_progress;
+                vec2 uv = coords_geo.xy;
+
+                vec3 coords_tex = niri_geo_to_tex * coords_geo;
+                vec2 tex_uv = coords_tex.st;
+
+                // Aggressive per-band horizontal tearing
+                float line_id = floor(uv.y * 70.0);
+                float band_noise = noise(vec2(line_id, floor(p * 24.0)));
+                float band_mask = step(0.45, band_noise);
+
+                float tear = (noise(vec2(line_id * 1.7, floor(p * 40.0))) - 0.5)
+                           * 0.18 * band_mask;
+
+                // Add finer secondary tearing
+                float micro = (noise(vec2(floor(uv.y * 220.0), floor(p * 80.0))) - 0.5)
+                            * 0.04;
+
+                tex_uv.x += tear + micro;
+
+                // Channel-separated glitch
+                float ch = 0.012 + 0.028 * p;
+                float r = texture2D(niri_tex, tex_uv + vec2(ch, 0.0)).r;
+                float g = texture2D(niri_tex, tex_uv).g;
+                float b = texture2D(niri_tex, tex_uv - vec2(ch, 0.0)).b;
+                float a = texture2D(niri_tex, tex_uv).a;
+
+                vec4 color = vec4(r, g, b, a);
+
+                // Bright digital tearing streaks
+                float streak = step(0.82, noise(vec2(line_id * 2.3, floor(p * 60.0))));
+                color.rgb += streak * band_mask * 0.22;
+
+                // Rapid fade with glitch hanging on for a moment
+                float alpha = 1.0 - smoothstep(0.0, 1.0, p);
+                alpha *= 1.0 - smoothstep(0.45, 1.0, p);
+
+                // Break the window apart near the end
+                float breakup = step(noise(uv * 24.0 + vec2(0.0, p * 30.0)), 1.0 - p * 1.15);
+                alpha *= breakup;
+
+                return vec4(color.rgb, color.a * alpha);
+            }
+        "
+    }
+}
+

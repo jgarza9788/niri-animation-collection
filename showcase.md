@@ -20,6 +20,24 @@ _No demo image found for bloom_
 ---
 ---
 
+## Dither-glitch
+
+```c
+/*
+Title: Dither-glitch
+Authors: Joe Hsu<jhsu.x1@gmail.com>
+Desc: Dither fade in, glitch out
+Demo: ./demos/dither-glitch.gif
+*/
+```
+
+<img src="./demos/dither-glitch.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
 ## energize_b_niri
 
 ```c
