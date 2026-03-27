@@ -3,6 +3,8 @@ Title: smoke
 Authors: liixini | https://github.com/liixini 
 Desc: a smoke animation preset for niri.
 Demo: ./demos/smoke.gif
+Note:
+- https://github.com/liixini/shaders
 */
 
 
@@ -169,6 +171,7 @@ animations {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
         }
 
+        //generates a random number, based one a vec2
         float noise(vec2 p) {
             vec2 i = floor(p);
             vec2 f = fract(p);
@@ -223,7 +226,7 @@ animations {
 
             vec4 color = texture2D(niri_tex_next, coords_geo.st );
             return color * (1.0 - sin(reveal*3.14));
-
+            //              ^ this will curve from one to zero and back up onw
             
         }
         "
