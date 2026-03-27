@@ -20,54 +20,19 @@ _No demo image found for bloom_
 ---
 ---
 
-## burn-ashes
+## energize_b_niri
 
 ```c
 /*
-Title: burn-ashes
-Authors: chaoscatsofficial@gmail.com
-Desc: imported from https://github.com/XansiVA/nirimation
-Demo: ./demos/burn-ashes.gif
+Shader: energize_b
+Authors: Justin Garza <JGarza9788@gmail.com>
+Based on: Energize B by Simon Schneegans
+Desc: Burn-My-Windows Energize B style effect adapted for niri.
+Demo: ./demos/energize_b.gif
 */
 ```
 
-<img src="./demos/burn-ashes.gif" alt="demo_gif" height="300">
-
-
----
----
----
-
-## burn
-
-```c
-/*
-Title: burn
-Authors: chaoscatsofficial@gmail.com
-Desc: imported from https://github.com/XansiVA/nirimation
-Demo: ./demos/burn.gif
-*/
-```
-
-<img src="./demos/burn.gif" alt="demo_gif" height="300">
-
-
----
----
----
-
-## burn-multicolor
-
-```c
-/*
-Title: burn-multicolor
-Authors: chaoscatsofficial@gmail.com
-Desc: imported from https://github.com/XansiVA/nirimation
-Demo: ./demos/burn-multicolor.gif
-*/
-```
-
-_No demo image found for burn-multicolor_
+<img src="./demos/energize_b.gif" alt="demo_gif" height="300">
 
 
 ---
@@ -126,6 +91,25 @@ Demo: ./demos/glitch.gif
 ```
 
 <img src="./demos/glitch.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
+## incinerate
+
+```c
+/*
+Shader: incinerate
+Authors: Justin Garza <JGarza9788@gmail.com>
+Based on: incinerate by Simon Schneegans
+Desc: A Burn-My-Windows style fire burn effect adapted for niri custom shaders.
+Demo: ./demos/incinerate.gif
+*/
+```
+
+<img src="./demos/incinerate.gif" alt="demo_gif" height="300">
 
 
 ---
@@ -216,26 +200,6 @@ Demo: ./demos/roll-drop.gif
 ```
 
 <img src="./demos/roll-drop.gif" alt="demo_gif" height="300">
-
-
----
----
----
-
-## startrek
-
-```c
-/*
-Title: startrek
-Authors: exodist7@gmail.com
-Desc: Niri animations for star trek beam in-out windows
-Demo: ./demos/startrek.gif
-Notes:
-* https://gist.github.com/exodist/370c9151280b4eeed21c3daaaa73305a#file-config-kdl
-*/
-```
-
-<img src="./demos/startrek.gif" alt="demo_gif" height="300">
 
 
 ---
