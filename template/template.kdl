@@ -18,22 +18,81 @@ animations {
     window-open {
         duration-ms 150
         curve "ease-out-expo"
+
+        custom-shader r"
+// functions - if needed
+
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+    if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+        coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+        return vec4(0.0);
+    }
+
+    // variables - if needed
+
+    // code
+
+    //return color 
+    return vec4(1.0,0.0,0.0,1.0);
+}
+        "
     }
 
     window-close {
         duration-ms 150
         curve "ease-out-quad"
+
+        custom-shader r"
+// functions - if needed
+
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+        coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+        return vec4(0.0);
     }
+
+    // variables - if needed
+
+    // code
+
+    //return color 
+    return vec4(1.0,0.0,0.0,1.0);
+}
+        "
+    }
+
+    window-resize {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+
+        custom-shader r"
+// functions - if needed
+
+vec4 resize_color(vec3 coords_geo, vec3 size_geo) {
+    if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+        coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+        return vec4(0.0);
+    }
+
+    // variables - if needed
+
+    // code
+
+    //return color     
+    return vec4(1.0,0.0,0.0,1.0);
+}
+        "
+    }
+
+
+// ***animations below do not use a shaders ***
+// these are not required
+
 
     horizontal-view-movement {
         spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
     }
 
     window-movement {
-        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
-    }
-
-    window-resize {
         spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
     }
 

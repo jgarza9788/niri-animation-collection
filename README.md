@@ -40,3 +40,8 @@ Thank you for contributing! Steps:
 ## References
 
 - Configuration reference: https://github.com/niri-wm/niri/wiki/Configuration:-Animations
+
+## THANKS (attribution/credit/acknowledgment)
+chaoscatsofficial@gmail.com | https://github.com/XansiVA/nirimation  
+
+schneegans | https://github.com/Schneegans/Burn-My-Windows  

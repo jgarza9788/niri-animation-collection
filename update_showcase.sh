@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -10,7 +9,7 @@ mkdir -p "$OUT_DIR"
 cat > "$OUT_FILE" <<'MD'
 # Showcase
 
-This page lists available animations and their demo images (GIF/PNG).
+This page lists available animations and their header blocks and demo images.
 
 MD
 
@@ -22,39 +21,50 @@ if [ ${#files[@]} -eq 0 ]; then
 	exit 0
 fi
 
-
-# for file in "${files[@]}"; do
-# 	echo "$file"
-# done
-
 for file in "${files[@]}"; do
 	base=$(basename "$file")
 	name="${base%.*}"
 
-	header=$(sed -n '1,50p' "$file")
+	# Extract full /* ... */ header block
+	header=$(awk '
+		BEGIN { in_header=0 }
+		/^[[:space:]]*\/\*/ { in_header=1 }
+		in_header { print }
+		/\*\// && in_header { exit }
+	' "$file")
 
-	title=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /title:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
-	authors=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /authors:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
-	desc=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /Desc:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
-	gifpath=$(printf "%s" "$header" | awk 'BEGIN{IGNORECASE=1} /Demo:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
-
-	echo -e "$title\n$authors\\n$desc\\n$gifpath"
-
+	# Try to extract a title from the header (fallback to filename)
+	title=$(printf "%s\n" "$header" | awk 'BEGIN{IGNORECASE=1} /title:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
 	[ -z "$title" ] && title="$name"
 
-	echo "## $title  " >> "$OUT_FILE"
-	echo "* Authors: $authors  " >> "$OUT_FILE"
-	if [ -n "$desc" ]; then
-		echo "* Desc: $desc  " >> "$OUT_FILE"
+	# Extract demo image path if present
+	gifpath=$(printf "%s\n" "$header" | awk 'BEGIN{IGNORECASE=1} /Demo:/{sub(/^[^:]*:[ \t]*/,"",$0); print; exit}')
+
+	echo "## $title" >> "$OUT_FILE"
+	echo "" >> "$OUT_FILE"
+
+	if [ -n "$header" ]; then
+		echo '```c' >> "$OUT_FILE"
+		printf "%s\n" "$header" >> "$OUT_FILE"
+		echo '```' >> "$OUT_FILE"
+		echo "" >> "$OUT_FILE"
+	else
+		echo "_No header comment found for ${title}_" >> "$OUT_FILE"
+		echo "" >> "$OUT_FILE"
 	fi
 
-	if [ -n "$gifpath" ]; then
-		echo "![${title}](${gifpath})  " >> "$OUT_FILE"
+	
+	if [ -n "$gifpath" ] && [ -f "$gifpath" ]; then
+		echo "<img src=\"$gifpath\" alt=\"demo_gif\" height=\"300\">" >> "$OUT_FILE"
+		echo "" >> "$OUT_FILE"
 	else
 		echo "_No demo image found for ${title}_" >> "$OUT_FILE"
+		echo "" >> "$OUT_FILE"
 	fi
 
 	echo "" >> "$OUT_FILE"
+	echo "---" >> "$OUT_FILE"
+	echo "---" >> "$OUT_FILE"
 	echo "---" >> "$OUT_FILE"
 	echo "" >> "$OUT_FILE"
 done

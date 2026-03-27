@@ -1,0 +1,85 @@
+/*
+Title: startrek
+Authors: exodist7@gmail.com
+Desc: Niri animations for star trek beam in-out windows
+Demo: ./demos/startrek.gif
+Notes:
+* https://gist.github.com/exodist/370c9151280b4eeed21c3daaaa73305a#file-config-kdl
+*/
+
+
+animations {
+    window-movement {
+        duration-ms 1000
+    }
+
+    window-open {
+        duration-ms 500
+
+        curve "linear"
+
+        custom-shader r"
+            vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+                float within_bounds = step(0.0, coords_geo.x) * step(coords_geo.x, 1.0) *
+                                     step(0.0, coords_geo.y) * step(coords_geo.y, 1.0);
+                float progress = niri_clamped_progress;
+                // Vertical beam sweep (moves from top to bottom)
+                float beam_pos = progress * 1.2 - 0.1;
+                float beam = smoothstep(beam_pos - 0.05, beam_pos, coords_geo.y) *
+                             smoothstep(beam_pos + 0.05, beam_pos, coords_geo.y);
+                // Transporter glittering noise
+                float noise = fract(sin(dot(coords_geo.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                float sparkle = step(0.95, fract(noise + progress * 5.0));
+                // Materialization logic: as progress increases, alpha increases
+                // Window content is hidden where noise > progress
+                float alpha = smoothstep(1.0 - progress - 0.1, 1.0 - progress, 1.0 - noise);
+                // Sample the window texture
+                vec4 color = texture2D(niri_tex, coords_geo.xy);
+                // Transporter energy color (blue-white)
+                vec3 beam_color = vec3(0.6, 0.8, 1.0) * (beam * 2.0 + sparkle);
+                // Add the beam/sparkle glow on top of the appearing window
+                // The beam and sparkles are most visible where the window is still transparent
+                color.rgb = mix(color.rgb, beam_color, (1.0 - alpha) + beam);
+                // Final composite: window color + transporter energy, clipped to window bounds
+                return (color * alpha + (vec4(beam_color, 1.0) * beam * 0.5)) * within_bounds;
+            }
+        "
+    }
+    
+    window-close {
+        duration-ms 500
+
+        curve "linear"
+
+        custom-shader r"
+            vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+                // Confine to window boundaries
+                float within_bounds = step(0.0, coords_geo.x) * step(coords_geo.x, 1.0) *
+                                     step(0.0, coords_geo.y) * step(coords_geo.y, 1.0);
+                float progress = niri_clamped_progress;
+                // Invert progress for the closing sequence (1.0 is start, 0.0 is end)
+                float inverse_progress = 1.0 - progress;
+                // Vertical beam sweep (moves top to bottom as progress increases)
+                float beam_pos = progress * 1.2 - 0.1;
+                float beam = smoothstep(beam_pos - 0.05, beam_pos, coords_geo.y) *
+                             smoothstep(beam_pos + 0.05, beam_pos, coords_geo.y);
+                // Glittering noise effect
+                float noise = fract(sin(dot(coords_geo.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                float sparkle = step(0.95, fract(noise + progress * 5.0));
+                // Visibility: starts at 1.0 and shrinks toward 0.0 based on noise
+                // This ensures the window remains until the transporter beam eats it
+                float alpha = smoothstep(progress - 0.1, progress, 1.0 - noise);
+                // Sample texture
+                vec4 color = texture2D(niri_tex, coords_geo.xy);
+                // Transporter blue-white glow
+                vec3 beam_color = vec3(0.6, 0.8, 1.0) * (beam * 2.0 + sparkle);
+                // Mix window color with beam glow
+                // As alpha drops, the beam/sparkle becomes the dominant visual
+                color.rgb = mix(color.rgb, beam_color, (1.0 - alpha) + beam);
+                // Combine and clip
+                // Adding the beam/sparkle to the return ensures they are visible even when alpha is 0
+                return (color * alpha + vec4(beam_color * beam, 0.0)) * within_bounds;
+            }
+        "
+    }
+}
