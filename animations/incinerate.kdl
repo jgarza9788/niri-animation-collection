@@ -1,0 +1,364 @@
+/*
+Shader: incinerate
+Authors: Justin Garza <JGarza9788@gmail.com>
+Based on: incinerate by Simon Schneegans
+Desc: A Burn-My-Windows style fire burn effect adapted for niri custom shaders.
+Demo: ./demos/incinerate.gif
+*/
+
+
+animations {
+
+    // Slow down all animations by this factor. Values below 1 speed them up instead.
+    slowdown 3.0
+
+    workspace-switch {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+
+    window-open {
+        duration-ms 280
+        curve "linear"
+
+        custom-shader r"
+float saturate(float x) {
+    return clamp(x, 0.0, 1.0);
+}
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 4; i++) {
+        v += a * noise(p);
+        p *= 2.0;
+        a *= 0.5;
+    }
+    return v;
+}
+
+vec3 fire_ramp(float t) {
+    t = saturate(t);
+    vec3 ember = vec3(0.00, 0.00, 0.00);
+    vec3 flame = vec3(1.00, 0.35, 0.05);
+    vec3 hot   = vec3(1.00, 0.95, 0.75);
+    return mix(mix(ember, flame, saturate(t * 1.6)), hot, saturate((t - 0.45) * 1.8));
+}
+
+vec4 alpha_over(vec4 base, vec4 over) {
+    return over + base * (1.0 - over.a);
+}
+
+vec4 burn_sample(vec3 coords_geo, vec3 size_geo, bool opening) {
+    if (coords_geo.x < -1.2 || coords_geo.x > 2.2 || coords_geo.y < -1.2 || coords_geo.y > 2.2) {
+        return vec4(0.0);
+    }
+
+    vec2 uv = coords_geo.xy;
+    vec3 tex_coords = niri_geo_to_tex * coords_geo;
+    vec4 tex = texture2D(niri_tex, tex_coords.st);
+
+    float progress = niri_clamped_progress;
+    float scale = 1.0;
+    float turbulence = 0.22;
+    vec2 start_pos = vec2(0.5, 0.95);
+    vec2 seed = vec2(niri_random_seed, fract(niri_random_seed * 37.17));
+
+    float scorch_width = 0.20 * scale;
+    float burn_width   = 0.030 * scale;
+    float smoke_width  = 0.90 * scale;
+    float flame_width  = 0.20 * scale;
+
+    float hide_threshold = mix(opening ? 0.0 : -scorch_width,
+                               1.0 + smoke_width,
+                               progress);
+
+    vec2 scorch_range = opening
+        ? vec2(hide_threshold - scorch_width, hide_threshold)
+        : vec2(hide_threshold, hide_threshold + scorch_width);
+    vec2 burn_range  = vec2(hide_threshold - burn_width, hide_threshold + burn_width);
+    vec2 flame_range = vec2(hide_threshold - flame_width, hide_threshold);
+    vec2 smoke_range = vec2(hide_threshold - smoke_width, hide_threshold);
+
+    float aspect = max(size_geo.x, size_geo.y);
+    float circle = length((uv - start_pos) * (size_geo.xy / aspect));
+
+    vec2 p = uv * (size_geo.xy / 240.0) / scale;
+    float smoke_noise = fbm(p * 2.2 + seed + vec2(0.0, progress * 1.8));
+    float gradient = mix(circle, smoke_noise,
+                         saturate(200.0 * turbulence * scale / max(size_geo.x, size_geo.y)));
+
+    float smoke_mask = smoothstep(0.0, 1.0, (gradient - smoke_range.x) / smoke_width);
+    float flame_mask = smoothstep(0.0, 1.0, (gradient - flame_range.x) / flame_width);
+    float fire_mask = smoothstep(1.0, 0.0, abs(gradient - hide_threshold) / burn_width);
+    float scorch_mask = smoothstep(1.0, 0.0, (gradient - scorch_range.x) / scorch_width);
+
+    if (opening) {
+        scorch_mask = 1.0 - scorch_mask;
+    }
+
+    vec4 color = vec4(0.0);
+    bool show_tex = (!opening && gradient > hide_threshold) || (opening && gradient < hide_threshold);
+
+    if (show_tex) {
+        color = tex;
+    }
+
+    if (smoke_range.x < gradient && gradient < smoke_range.y) {
+        float smoke = smoke_mask * smoke_noise * 0.55;
+        color = alpha_over(color, vec4(vec3(smoke * 0.45), smoke));
+
+        float ember_noise = fbm(p * 5.0 + seed * 3.0 - smoke_noise * vec2(0.0, 0.8));
+        float embers = clamp(pow(max(ember_noise - 0.15, 0.0), 8.0) * 3.0, 0.0, 1.0) * smoke_mask;
+        vec3 ember_rgb = fire_ramp(0.45 + embers * 0.55) * embers;
+        color += vec4(ember_rgb, embers);
+    }
+
+    if (scorch_range.x < gradient && gradient < scorch_range.y) {
+        vec3 scorch = mix(color.rgb, vec3(0.10, 0.05, 0.02) * color.a, 0.4);
+        color.rgb = mix(color.rgb, scorch, scorch_mask);
+    }
+
+    if (min(burn_range.x, flame_range.x) < gradient && gradient < max(burn_range.y, flame_range.y)) {
+        float flame_noise = fbm(p * 3.2 + seed * 5.0 + vec2(0.0, progress * 3.5));
+
+        if (flame_range.x < gradient && gradient < flame_range.y) {
+            float flame = clamp(pow(max(flame_noise - 0.05, 0.0), 5.5) * 2.4, 0.0, 1.0) * flame_mask;
+            vec3 flame_rgb = fire_ramp(0.65 + flame * 0.35) * flame;
+            color += vec4(flame_rgb, flame);
+        }
+
+        if (burn_range.x < gradient && gradient < burn_range.y) {
+            float fire = fire_mask * pow(max(flame_noise, 0.0), 2.0) * max(color.a, 0.15);
+            fire = clamp(fire, 0.0, 1.0);
+            vec3 fire_rgb = fire_ramp(0.75 + fire * 0.25) * fire;
+            color += vec4(fire_rgb, fire);
+        }
+    }
+
+    return color;
+}
+
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+    if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+        coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+        return vec4(0.0);
+    }
+
+    return burn_sample(coords_geo, size_geo, true);
+}
+        "
+    }
+
+    window-close {
+        duration-ms 280
+        curve "linear"
+
+        custom-shader r"
+float saturate(float x) {
+    return clamp(x, 0.0, 1.0);
+}
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 4; i++) {
+        v += a * noise(p);
+        p *= 2.0;
+        a *= 0.5;
+    }
+    return v;
+}
+
+vec3 fire_ramp(float t) {
+    t = saturate(t);
+    vec3 ember = vec3(0.00, 0.00, 0.00);
+    vec3 flame = vec3(1.00, 0.35, 0.05);
+    vec3 hot   = vec3(1.00, 0.95, 0.75);
+    return mix(mix(ember, flame, saturate(t * 1.6)), hot, saturate((t - 0.45) * 1.8));
+}
+
+vec4 alpha_over(vec4 base, vec4 over) {
+    return over + base * (1.0 - over.a);
+}
+
+vec4 burn_sample(vec3 coords_geo, vec3 size_geo, bool opening) {
+    if (coords_geo.x < -1.2 || coords_geo.x > 2.2 || coords_geo.y < -1.2 || coords_geo.y > 2.2) {
+        return vec4(0.0);
+    }
+
+    vec2 uv = coords_geo.xy;
+    vec3 tex_coords = niri_geo_to_tex * coords_geo;
+    vec4 tex = texture2D(niri_tex, tex_coords.st);
+
+    float progress = niri_clamped_progress;
+    float scale = 1.0;
+    float turbulence = 0.22;
+    vec2 start_pos = vec2(0.5, 0.95);
+    vec2 seed = vec2(niri_random_seed, fract(niri_random_seed * 37.17));
+
+    float scorch_width = 0.20 * scale;
+    float burn_width   = 0.030 * scale;
+    float smoke_width  = 0.90 * scale;
+    float flame_width  = 0.20 * scale;
+
+    float hide_threshold = mix(opening ? 0.0 : -scorch_width,
+                               1.0 + smoke_width,
+                               progress);
+
+    vec2 scorch_range = opening
+        ? vec2(hide_threshold - scorch_width, hide_threshold)
+        : vec2(hide_threshold, hide_threshold + scorch_width);
+    vec2 burn_range  = vec2(hide_threshold - burn_width, hide_threshold + burn_width);
+    vec2 flame_range = vec2(hide_threshold - flame_width, hide_threshold);
+    vec2 smoke_range = vec2(hide_threshold - smoke_width, hide_threshold);
+
+    float aspect = max(size_geo.x, size_geo.y);
+    float circle = length((uv - start_pos) * (size_geo.xy / aspect));
+
+    vec2 p = uv * (size_geo.xy / 240.0) / scale;
+    float smoke_noise = fbm(p * 2.2 + seed + vec2(0.0, progress * 1.8));
+    float gradient = mix(circle, smoke_noise,
+                         saturate(200.0 * turbulence * scale / max(size_geo.x, size_geo.y)));
+
+    float smoke_mask = smoothstep(0.0, 1.0, (gradient - smoke_range.x) / smoke_width);
+    float flame_mask = smoothstep(0.0, 1.0, (gradient - flame_range.x) / flame_width);
+    float fire_mask = smoothstep(1.0, 0.0, abs(gradient - hide_threshold) / burn_width);
+    float scorch_mask = smoothstep(1.0, 0.0, (gradient - scorch_range.x) / scorch_width);
+
+    if (opening) {
+        scorch_mask = 1.0 - scorch_mask;
+    }
+
+    vec4 color = vec4(0.0);
+    bool show_tex = (!opening && gradient > hide_threshold) || (opening && gradient < hide_threshold);
+
+    if (show_tex) {
+        color = tex;
+    }
+
+    if (smoke_range.x < gradient && gradient < smoke_range.y) {
+        float smoke = smoke_mask * smoke_noise * 0.55;
+        color = alpha_over(color, vec4(vec3(smoke * 0.45), smoke));
+
+        float ember_noise = fbm(p * 5.0 + seed * 3.0 - smoke_noise * vec2(0.0, 0.8));
+        float embers = clamp(pow(max(ember_noise - 0.15, 0.0), 8.0) * 3.0, 0.0, 1.0) * smoke_mask;
+        vec3 ember_rgb = fire_ramp(0.45 + embers * 0.55) * embers;
+        color += vec4(ember_rgb, embers);
+    }
+
+    if (scorch_range.x < gradient && gradient < scorch_range.y) {
+        vec3 scorch = mix(color.rgb, vec3(0.10, 0.05, 0.02) * color.a, 0.4);
+        color.rgb = mix(color.rgb, scorch, scorch_mask);
+    }
+
+    if (min(burn_range.x, flame_range.x) < gradient && gradient < max(burn_range.y, flame_range.y)) {
+        float flame_noise = fbm(p * 3.2 + seed * 5.0 + vec2(0.0, progress * 3.5));
+
+        if (flame_range.x < gradient && gradient < flame_range.y) {
+            float flame = clamp(pow(max(flame_noise - 0.05, 0.0), 5.5) * 2.4, 0.0, 1.0) * flame_mask;
+            vec3 flame_rgb = fire_ramp(0.65 + flame * 0.35) * flame;
+            color += vec4(flame_rgb, flame);
+        }
+
+        if (burn_range.x < gradient && gradient < burn_range.y) {
+            float fire = fire_mask * pow(max(flame_noise, 0.0), 2.0) * max(color.a, 0.15);
+            fire = clamp(fire, 0.0, 1.0);
+            vec3 fire_rgb = fire_ramp(0.75 + fire * 0.25) * fire;
+            color += vec4(fire_rgb, fire);
+        }
+    }
+
+    return color;
+}
+
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+        coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+        return vec4(0.0);
+    }
+
+    return burn_sample(coords_geo, size_geo, false);
+}
+        "
+    }
+
+    window-resize {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+
+        custom-shader r"
+vec4 resize_color(vec3 coords_curr_geo, vec3 size_curr_geo) {
+    vec3 coords_tex_next = niri_geo_to_tex_next * coords_curr_geo;
+    vec4 color = texture2D(niri_tex_next, coords_tex_next.st);
+    return color;
+}
+        "
+    }
+
+
+// ***animations below do not use a shaders ***
+// these are not required
+
+
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    window-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    config-notification-open-close {
+        spring damping-ratio=0.6 stiffness=1000 epsilon=0.001
+    }
+
+    exit-confirmation-open-close {
+        spring damping-ratio=0.6 stiffness=500 epsilon=0.01
+    }
+
+    screenshot-ui-open {
+        duration-ms 200
+        curve "ease-out-quad"
+    }
+
+    overview-open-close {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    recent-windows-close {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.001
+    }
+}

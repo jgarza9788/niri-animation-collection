@@ -85,17 +85,6 @@ animations {
         "
     }
 
-    horizontal-view-movement {
-        // Main "camera glide" for scrollable movement.
-        spring damping-ratio=1.0 stiffness=640 epsilon=0.0001
-    }
-
-    window-movement {
-        // Individual windows shift with a slightly tighter response
-        // than the camera, so it feels organized.
-        spring damping-ratio=1.0 stiffness=700 epsilon=0.0001
-    }
-
     window-resize {
         // Resizes should feel soft but controlled.
         spring damping-ratio=1.0 stiffness=720 epsilon=0.0001
@@ -117,6 +106,20 @@ animations {
                 return color;
             }
         "
+    }
+
+// ***animations below do not use a shaders ***
+// these are not required
+
+    horizontal-view-movement {
+        // Main "camera glide" for scrollable movement.
+        spring damping-ratio=1.0 stiffness=640 epsilon=0.0001
+    }
+
+    window-movement {
+        // Individual windows shift with a slightly tighter response
+        // than the camera, so it feels organized.
+        spring damping-ratio=1.0 stiffness=700 epsilon=0.0001
     }
 
     config-notification-open-close {

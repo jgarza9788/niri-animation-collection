@@ -1,0 +1,414 @@
+/*
+Shader: energize_b
+Authors: Justin Garza <JGarza9788@gmail.com>
+Based on: Energize B by Simon Schneegans
+Desc: Burn-My-Windows Energize B style effect adapted for niri.
+Demo: ./demos/energize_b.gif
+*/
+
+
+animations {
+    window-open {
+        duration-ms 380
+        curve "linear"
+
+        custom-shader r"
+            const vec3 EFFECT_COLOR = vec3(0.35, 0.85, 1.00);
+
+            const float SHOWER_TIME  = 0.30;
+            const float SHOWER_WIDTH = 0.30;
+            const float STREAK_TIME  = 0.60;
+            const float EDGE_FADE_PX = 50.0;
+
+            float easeOutQuad(float t) {
+                return -t * (t - 2.0);
+            }
+
+            float hash12(vec2 p) {
+                vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.x + p3.y) * p3.z);
+            }
+
+            vec2 hash22(vec2 p) {
+                vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.xx + p3.yz) * p3.zy);
+            }
+
+            float simplex2D(vec2 p) {
+                const float K1 = 0.366025404;
+                const float K2 = 0.211324865;
+
+                vec2 i = floor(p + (p.x + p.y) * K1);
+                vec2 a = p - i + (i.x + i.y) * K2;
+                float m = step(a.y, a.x);
+                vec2 o = vec2(m, 1.0 - m);
+                vec2 b = a - o + K2;
+                vec2 c = a - 1.0 + 2.0 * K2;
+
+                vec3 h = max(0.5 - vec3(dot(a, a), dot(b, b), dot(c, c)), 0.0);
+                vec3 n = h * h * h * h * vec3(
+                    dot(a, -1.0 + 2.0 * hash22(i + 0.0)),
+                    dot(b, -1.0 + 2.0 * hash22(i + o)),
+                    dot(c, -1.0 + 2.0 * hash22(i + 1.0))
+                );
+
+                return 0.5 + 0.5 * dot(n, vec3(70.0));
+            }
+
+            float simplex2DFractal(vec2 p) {
+                mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+                float f = 0.5000 * simplex2D(p);
+                p = m * p;
+                f += 0.2500 * simplex2D(p);
+                p = m * p;
+                f += 0.1250 * simplex2D(p);
+                p = m * p;
+                f += 0.0625 * simplex2D(p);
+                return f;
+            }
+
+            float simplex3D(vec3 p) {
+                const float F3 = 0.3333333;
+                const float G3 = 0.1666667;
+
+                vec3 s = floor(p + dot(p, vec3(F3)));
+                vec3 x = p - s + dot(s, vec3(G3));
+
+                vec3 e = step(vec3(0.0), x - x.yzx);
+                vec3 i1 = e * (1.0 - e.zxy);
+                vec3 i2 = 1.0 - e.zxy * (1.0 - e);
+
+                vec3 x1 = x - i1 + G3;
+                vec3 x2 = x - i2 + 2.0 * G3;
+                vec3 x3 = x - 1.0 + 3.0 * G3;
+
+                vec4 w;
+                w.x = dot(x, x);
+                w.y = dot(x1, x1);
+                w.z = dot(x2, x2);
+                w.w = dot(x3, x3);
+                w = max(0.6 - w, 0.0);
+                w *= w;
+                w *= w;
+
+                vec4 grad;
+                grad.x = dot(-1.0 + 2.0 * vec3(hash12(s.xy), hash12(s.yz + 11.0), hash12(s.zx + 23.0)), x);
+                grad.y = dot(-1.0 + 2.0 * vec3(hash12((s + i1).xy), hash12((s + i1).yz + 11.0), hash12((s + i1).zx + 23.0)), x1);
+                grad.z = dot(-1.0 + 2.0 * vec3(hash12((s + i2).xy), hash12((s + i2).yz + 11.0), hash12((s + i2).zx + 23.0)), x2);
+                grad.w = dot(-1.0 + 2.0 * vec3(hash12((s + 1.0).xy), hash12((s + 1.0).yz + 11.0), hash12((s + 1.0).zx + 23.0)), x3);
+
+                return 0.5 + 0.5 * dot(w, grad) * 8.0;
+            }
+
+            float edgeMaskPx(vec2 px, vec2 sizePx, float fadePx) {
+                float left   = smoothstep(0.0, fadePx, px.x);
+                float top    = smoothstep(0.0, fadePx, px.y);
+                float right  = smoothstep(0.0, fadePx, sizePx.x - px.x);
+                float bottom = smoothstep(0.0, fadePx, sizePx.y - px.y);
+                return left * top * right * bottom;
+            }
+
+            float relativeEdgeMask(vec2 uv, float fadeAmount) {
+                float left   = smoothstep(0.0, fadeAmount, uv.x);
+                float top    = smoothstep(0.0, fadeAmount, uv.y);
+                float right  = smoothstep(0.0, fadeAmount, 1.0 - uv.x);
+                float bottom = smoothstep(0.0, fadeAmount, 1.0 - uv.y);
+                return left * top * right * bottom;
+            }
+
+            vec4 getMasks(float progress, vec2 uv, vec2 sizePx) {
+                float showerProgress = progress / SHOWER_TIME;
+                float streakProgress = clamp((progress - SHOWER_TIME) / STREAK_TIME, 0.0, 1.0);
+                float fadeProgress   = clamp((progress - SHOWER_TIME) / (1.0 - SHOWER_TIME), 0.0, 1.0);
+
+                float t = uv.y;
+
+                float showerMask = smoothstep(
+                    1.0, 0.0,
+                    abs(showerProgress - t - SHOWER_WIDTH) / SHOWER_WIDTH
+                );
+
+                float streakMask = (showerProgress - t - SHOWER_WIDTH) > 0.0 ? 1.0 : 0.0;
+
+                float atomMask = relativeEdgeMask(uv, 0.2);
+                atomMask = max(0.0, atomMask - showerMask);
+                atomMask *= streakMask;
+                atomMask *= sqrt(max(0.0, 1.0 - fadeProgress * fadeProgress));
+
+                showerMask += 0.05 * streakMask;
+                streakMask = max(streakMask, showerMask);
+
+                float edgeFade = edgeMaskPx(uv * sizePx, sizePx, EDGE_FADE_PX);
+                showerMask *= edgeFade;
+                streakMask *= edgeFade;
+
+                float fade = smoothstep(0.0, 1.0, 1.0 + t - 2.0 * streakProgress);
+                showerMask *= fade;
+                streakMask *= fade;
+
+                float windowMask = 1.0 - pow(1.0 - fadeProgress, 2.0);
+
+                return vec4(showerMask, streakMask, atomMask, windowMask);
+            }
+
+            vec4 getInputColor(vec2 uv) {
+                vec3 texCoord = niri_geo_to_tex * vec3(uv, 1.0);
+                return texture2D(niri_tex, texCoord.xy);
+            }
+
+            vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+                vec2 uv = coords_geo.xy;
+
+                if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+                    return vec4(0.0);
+                }
+
+                float progress = easeOutQuad(niri_clamped_progress);
+
+                vec4 masks  = getMasks(progress, uv, size_geo.xy);
+                vec4 oColor = getInputColor(uv);
+
+                // Dissolve window to effect color / transparency.
+                oColor.rgb = mix(EFFECT_COLOR, oColor.rgb, 0.5 * masks.w + 0.5);
+                oColor.a   = oColor.a * masks.w;
+
+                // Add leading shower particles.
+                vec2 showerUV = uv + vec2(0.0, -0.7 * progress / SHOWER_TIME);
+                showerUV *= 0.02 * size_geo.xy;
+                float shower = pow(simplex2D(showerUV), 10.0);
+                oColor.rgb += EFFECT_COLOR * shower * masks.x;
+                oColor.a   += shower * masks.x;
+
+                // Add trailing streak lines.
+                vec2 streakUV = uv + vec2(0.0, -progress / SHOWER_TIME);
+                streakUV *= vec2(0.05 * size_geo.x, 0.001 * size_geo.y);
+                float streaks = simplex2DFractal(streakUV) * 0.5;
+                oColor.rgb += EFFECT_COLOR * streaks * masks.y;
+                oColor.a   += streaks * masks.y;
+
+                // Add glimmering atoms.
+                vec2 atomUV = uv + vec2(0.0, -0.025 * progress / SHOWER_TIME);
+                atomUV *= 0.2 * size_geo.xy;
+                float atoms = pow(simplex3D(vec3(atomUV, niri_clamped_progress * 3.8 + niri_random_seed * 10.0)), 5.0);
+                oColor.rgb += EFFECT_COLOR * atoms * masks.z;
+                oColor.a   += atoms * masks.z;
+
+                oColor.a = clamp(oColor.a, 0.0, 1.0);
+
+                // niri expects premultiplied alpha.
+                oColor.rgb *= oColor.a;
+
+                return oColor;
+            }
+        "
+    }
+
+    window-close {
+        duration-ms 380
+        curve "linear"
+
+        custom-shader r"
+            const vec3 EFFECT_COLOR = vec3(0.35, 0.85, 1.00);
+
+            const float SHOWER_TIME  = 0.30;
+            const float SHOWER_WIDTH = 0.30;
+            const float STREAK_TIME  = 0.60;
+            const float EDGE_FADE_PX = 50.0;
+
+            float easeOutQuad(float t) {
+                return -t * (t - 2.0);
+            }
+
+            float hash12(vec2 p) {
+                vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.x + p3.y) * p3.z);
+            }
+
+            vec2 hash22(vec2 p) {
+                vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.xx + p3.yz) * p3.zy);
+            }
+
+            float simplex2D(vec2 p) {
+                const float K1 = 0.366025404;
+                const float K2 = 0.211324865;
+
+                vec2 i = floor(p + (p.x + p.y) * K1);
+                vec2 a = p - i + (i.x + i.y) * K2;
+                float m = step(a.y, a.x);
+                vec2 o = vec2(m, 1.0 - m);
+                vec2 b = a - o + K2;
+                vec2 c = a - 1.0 + 2.0 * K2;
+
+                vec3 h = max(0.5 - vec3(dot(a, a), dot(b, b), dot(c, c)), 0.0);
+                vec3 n = h * h * h * h * vec3(
+                    dot(a, -1.0 + 2.0 * hash22(i + 0.0)),
+                    dot(b, -1.0 + 2.0 * hash22(i + o)),
+                    dot(c, -1.0 + 2.0 * hash22(i + 1.0))
+                );
+
+                return 0.5 + 0.5 * dot(n, vec3(70.0));
+            }
+
+            float simplex2DFractal(vec2 p) {
+                mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+                float f = 0.5000 * simplex2D(p);
+                p = m * p;
+                f += 0.2500 * simplex2D(p);
+                p = m * p;
+                f += 0.1250 * simplex2D(p);
+                p = m * p;
+                f += 0.0625 * simplex2D(p);
+                return f;
+            }
+
+            float simplex3D(vec3 p) {
+                const float F3 = 0.3333333;
+                const float G3 = 0.1666667;
+
+                vec3 s = floor(p + dot(p, vec3(F3)));
+                vec3 x = p - s + dot(s, vec3(G3));
+
+                vec3 e = step(vec3(0.0), x - x.yzx);
+                vec3 i1 = e * (1.0 - e.zxy);
+                vec3 i2 = 1.0 - e.zxy * (1.0 - e);
+
+                vec3 x1 = x - i1 + G3;
+                vec3 x2 = x - i2 + 2.0 * G3;
+                vec3 x3 = x - 1.0 + 3.0 * G3;
+
+                vec4 w;
+                w.x = dot(x, x);
+                w.y = dot(x1, x1);
+                w.z = dot(x2, x2);
+                w.w = dot(x3, x3);
+                w = max(0.6 - w, 0.0);
+                w *= w;
+                w *= w;
+
+                vec4 grad;
+                grad.x = dot(-1.0 + 2.0 * vec3(hash12(s.xy), hash12(s.yz + 11.0), hash12(s.zx + 23.0)), x);
+                grad.y = dot(-1.0 + 2.0 * vec3(hash12((s + i1).xy), hash12((s + i1).yz + 11.0), hash12((s + i1).zx + 23.0)), x1);
+                grad.z = dot(-1.0 + 2.0 * vec3(hash12((s + i2).xy), hash12((s + i2).yz + 11.0), hash12((s + i2).zx + 23.0)), x2);
+                grad.w = dot(-1.0 + 2.0 * vec3(hash12((s + 1.0).xy), hash12((s + 1.0).yz + 11.0), hash12((s + 1.0).zx + 23.0)), x3);
+
+                return 0.5 + 0.5 * dot(w, grad) * 8.0;
+            }
+
+            float edgeMaskPx(vec2 px, vec2 sizePx, float fadePx) {
+                float left   = smoothstep(0.0, fadePx, px.x);
+                float top    = smoothstep(0.0, fadePx, px.y);
+                float right  = smoothstep(0.0, fadePx, sizePx.x - px.x);
+                float bottom = smoothstep(0.0, fadePx, sizePx.y - px.y);
+                return left * top * right * bottom;
+            }
+
+            float relativeEdgeMask(vec2 uv, float fadeAmount) {
+                float left   = smoothstep(0.0, fadeAmount, uv.x);
+                float top    = smoothstep(0.0, fadeAmount, uv.y);
+                float right  = smoothstep(0.0, fadeAmount, 1.0 - uv.x);
+                float bottom = smoothstep(0.0, fadeAmount, 1.0 - uv.y);
+                return left * top * right * bottom;
+            }
+
+            vec4 getMasks(float progress, vec2 uv, vec2 sizePx) {
+                float showerProgress = progress / SHOWER_TIME;
+                float streakProgress = clamp((progress - SHOWER_TIME) / STREAK_TIME, 0.0, 1.0);
+                float fadeProgress   = clamp((progress - SHOWER_TIME) / (1.0 - SHOWER_TIME), 0.0, 1.0);
+
+                float t = uv.y;
+
+                float showerMask = smoothstep(
+                    1.0, 0.0,
+                    abs(showerProgress - t - SHOWER_WIDTH) / SHOWER_WIDTH
+                );
+
+                float streakMask = (showerProgress - t - SHOWER_WIDTH) > 0.0 ? 1.0 : 0.0;
+
+                float atomMask = relativeEdgeMask(uv, 0.2);
+                atomMask = max(0.0, atomMask - showerMask);
+                atomMask *= streakMask;
+                atomMask *= sqrt(max(0.0, 1.0 - fadeProgress * fadeProgress));
+
+                showerMask += 0.05 * streakMask;
+                streakMask = max(streakMask, showerMask);
+
+                float edgeFade = edgeMaskPx(uv * sizePx, sizePx, EDGE_FADE_PX);
+                showerMask *= edgeFade;
+                streakMask *= edgeFade;
+
+                float fade = smoothstep(0.0, 1.0, 1.0 + t - 2.0 * streakProgress);
+                showerMask *= fade;
+                streakMask *= fade;
+
+                float windowMask = pow(1.0 - fadeProgress, 2.0);
+
+                return vec4(showerMask, streakMask, atomMask, windowMask);
+            }
+
+            vec4 getInputColor(vec2 uv) {
+                vec3 texCoord = niri_geo_to_tex * vec3(uv, 1.0);
+                return texture2D(niri_tex, texCoord.xy);
+            }
+
+            vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+                vec2 uv = coords_geo.xy;
+
+                if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+                    return vec4(0.0);
+                }
+
+                float progress = easeOutQuad(niri_clamped_progress);
+
+                vec4 masks  = getMasks(progress, uv, size_geo.xy);
+                vec4 oColor = getInputColor(uv);
+
+                oColor.rgb = mix(EFFECT_COLOR, oColor.rgb, 0.5 * masks.w + 0.5);
+                oColor.a   = oColor.a * masks.w;
+
+                vec2 showerUV = uv + vec2(0.0, -0.7 * progress / SHOWER_TIME);
+                showerUV *= 0.02 * size_geo.xy;
+                float shower = pow(simplex2D(showerUV), 10.0);
+                oColor.rgb += EFFECT_COLOR * shower * masks.x;
+                oColor.a   += shower * masks.x;
+
+                vec2 streakUV = uv + vec2(0.0, -progress / SHOWER_TIME);
+                streakUV *= vec2(0.05 * size_geo.x, 0.001 * size_geo.y);
+                float streaks = simplex2DFractal(streakUV) * 0.5;
+                oColor.rgb += EFFECT_COLOR * streaks * masks.y;
+                oColor.a   += streaks * masks.y;
+
+                vec2 atomUV = uv + vec2(0.0, -0.025 * progress / SHOWER_TIME);
+                atomUV *= 0.2 * size_geo.xy;
+                float atoms = pow(simplex3D(vec3(atomUV, niri_clamped_progress * 3.8 + niri_random_seed * 10.0)), 5.0);
+                oColor.rgb += EFFECT_COLOR * atoms * masks.z;
+                oColor.a   += atoms * masks.z;
+
+                oColor.a = clamp(oColor.a, 0.0, 1.0);
+                oColor.rgb *= oColor.a;
+
+                return oColor;
+            }
+        "
+    }
+
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    window-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    window-resize {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    workspace-switch {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+}
