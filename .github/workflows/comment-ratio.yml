@@ -14,10 +14,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Count .kdl comment and total lines in `animations/`
+      - name: Count .kdl comment and total non-blank lines in `animations/`
         run: |
           set -o pipefail
-          # find .kdl files under animations/
+
           mapfile -d '' -t files < <(find animations -type f -name '*.kdl' -print0 2>/dev/null || true)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No .kdl files found in animations/; skipping comment ratio check."
@@ -26,18 +26,23 @@ jobs:
 
           total=0
           comments=0
+
           for f in "${files[@]}"; do
-            t=$(wc -l < "$f" || echo 0)
-            c=$(grep -h -E '^[[:space:]]*(//|#|;)' "$f" | wc -l || true)
+            # Count non-blank lines only
+            t=$(grep -cve '^[[:space:]]*$' "$f" || true)
+
+            # Count comment lines only among non-blank lines
+            c=$(grep -cE '^[[:space:]]*(//|#|;)' "$f" || true)
+
             total=$((total + t))
             comments=$((comments + c))
           done
 
-          echo "kdl total lines (animations): $total"
+          echo "kdl total non-blank lines (animations): $total"
           echo "kdl comment lines (animations): $comments"
 
           if [ "$total" -eq 0 ]; then
-            echo "No code lines detected in animations/*.kdl; skipping check."
+            echo "No non-blank lines detected in animations/*.kdl; skipping check."
             exit 0
           fi
 
