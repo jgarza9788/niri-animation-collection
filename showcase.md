@@ -97,18 +97,37 @@ Notes:
 ---
 ---
 
-## glitch
+## glitch_00
 
 ```c
 /*
-Title: glitch
+Title: glitch_00
 Authors: chaoscatsofficial@gmail.com
 Desc: imported from https://github.com/XansiVA/nirimation
-Demo: ./demos/glitch.gif
+Demo: ./demos/glitch_00.gif
 */
 ```
 
-<img src="./demos/glitch.gif" alt="demo_gif" height="300">
+<img src="./demos/glitch_00.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
+## glitch_01
+
+```c
+/*
+Title: glitch_01
+Authors: liixini | https://github.com/liixini 
++ adjustments by Justin Garza <JGarza9788@gmail.com> 
+Desc: a glitch animation preset for niri.
+Demo: ./demos/glitch_01.gif
+*/
+```
+
+<img src="./demos/glitch_01.gif" alt="demo_gif" height="300">
 
 
 ---
@@ -218,6 +237,24 @@ Demo: ./demos/roll-drop.gif
 ```
 
 <img src="./demos/roll-drop.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
+## smoke
+
+```c
+/*
+Title: smoke
+Authors: liixini | https://github.com/liixini 
+Desc: a smoke animation preset for niri.
+Demo: ./demos/smoke.gif
+*/
+```
+
+<img src="./demos/smoke.gif" alt="demo_gif" height="300">
 
 
 ---

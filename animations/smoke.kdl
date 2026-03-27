@@ -9,8 +9,7 @@ Demo: ./demos/smoke.gif
 animations {
 
     // Slow down all animations by this factor. Values below 1 speed them up instead.
-    slowdown 1.5
-
+    //slowdown 1.5
 
     window-open {
         duration-ms 150
@@ -206,18 +205,12 @@ animations {
         }
 
         vec4 resize_color(vec3 coords_geo, vec3 size_geo) {
-            if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
-                coords_geo.y < 0.0 || coords_geo.y > 1.0) {
-                return vec4(0.0);
-            }
 
-            float p = niri_clamped_progress;
+
+            float p = niri_clamped_progress ;
             vec2 uv = coords_geo.xy;
-            float seed = niri_random_seed * 100.0;
+            float seed = noise(uv) ;
 
-            // Strongest in the middle of the resize so it feels like the same
-            // smoke language as open/close without fully hiding the window.
-            float pulse = sin(p * 3.141592653589793);
             float t = p * 12.0 + seed;
 
             float fluid = warpedFbm(uv * 2.0 + seed, t);
@@ -225,21 +218,13 @@ animations {
             vec2 center = uv - 0.5;
             float dist = length(center * vec2(1.0, 0.7));
 
-            float smoke = (1.0 - dist * 1.2) + (1.0 - fluid) * 0.7;
-            float veil = smoothstep(smoke + 0.5, smoke - 0.5, (1.0 - pulse) * 1.8);
+            float appear = (1.0 - dist * 1.2) + (1.0 - fluid) * 0.7;
+            float reveal = smoothstep(appear + 0.5, appear - 0.5, (1.0 - p) * 1.8);
 
-            float distort_strength = pulse * pulse * 0.3;
-            vec2 wq = vec2(fbm(uv * 2.0 + vec2(0.0, t * 0.2)),
-                            fbm(uv * 2.0 + vec2(5.2, t * 0.2)));
-            vec2 wr = vec2(fbm(uv * 2.0 + 4.0 * wq + vec2(1.7, 9.2)),
-                            fbm(uv * 2.0 + 4.0 * wq + vec2(8.3, 2.8)));
-            vec2 warped_uv = uv + (wr - 0.5) * distort_strength;
+            vec4 color = texture2D(niri_tex_next, coords_geo.st );
+            return color * (1.0 - sin(reveal*3.14));
 
-            vec3 tex_coords = niri_geo_to_tex * vec3(warped_uv, 1.0);
-            vec4 color = texture2D(niri_tex, tex_coords.st);
-
-            float alpha = mix(1.0, veil, 0.35 * pulse);
-            return color * alpha;
+            
         }
         "
     }
