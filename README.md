@@ -32,7 +32,7 @@ Thank you for contributing! Steps:
     * [EZGIF.com](https://ezgif.com/) can help you trim/cut and convert a video
 
 ### Guidelines:
-- Keep each animation self-contained in its folder.
+- Keep each animation self-contained in its file.
 - Include any metadata or example config needed for niri to load the animation.
 - Provide attribution for any third-party assets.
 

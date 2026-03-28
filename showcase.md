@@ -20,6 +20,24 @@ _No demo image found for bloom_
 ---
 ---
 
+## Blur
+
+```c
+/*
+Title: Blur
+Authors: Justin Garza <JGarza9788@gmail.com>
+Desc: a Blur animation
+Demo: ./demos/blur.gif
+*/
+```
+
+<img src="./demos/blur.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
 ## Dither-glitch
 
 ```c
@@ -124,6 +142,8 @@ Authors: liixini | https://github.com/liixini
 + adjustments by Justin Garza <JGarza9788@gmail.com> 
 Desc: a glitch animation preset for niri.
 Demo: ./demos/glitch_01.gif
+Note:
+- https://github.com/liixini/shaders
 */
 ```
 
@@ -251,6 +271,8 @@ Title: smoke
 Authors: liixini | https://github.com/liixini 
 Desc: a smoke animation preset for niri.
 Demo: ./demos/smoke.gif
+Note:
+- https://github.com/liixini/shaders
 */
 ```
 

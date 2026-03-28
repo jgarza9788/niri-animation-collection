@@ -13,10 +13,6 @@ animations {
     // Uncomment while tuning.
     slowdown 1.5
 
-    workspace-switch {
-        // Smooth, composed, no bounce.
-        spring damping-ratio=1.0 stiffness=760 epsilon=0.0001
-    }
 
     window-open {
         duration-ms 260
@@ -111,6 +107,12 @@ animations {
 // ***animations below do not use a shaders ***
 // these are not required
 
+
+    workspace-switch {
+        // Smooth, composed, no bounce.
+        spring damping-ratio=1.0 stiffness=760 epsilon=0.0001
+    }
+    
     horizontal-view-movement {
         // Main "camera glide" for scrollable movement.
         spring damping-ratio=1.0 stiffness=640 epsilon=0.0001
