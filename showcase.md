@@ -283,3 +283,21 @@ Note:
 ---
 ---
 
+## tv_crt
+
+```c
+/*
+Title: tv_crt
+Authors: Justin Garza
+Desc: CRT television style power-on and power-off animation for niri.
+Demo: ./demos/tv_crt.gif
+*/
+```
+
+<img src="./demos/tv_crt.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
