@@ -191,6 +191,28 @@ Demo: ./demos/pixelate.gif
 ---
 ---
 
+## pixel-sort
+
+```c
+/*
+Title: pixel-sort
+Authors: Joe Hsu<jhsu.x1@gmail.com
+Desc: Reverse pixel-sort into the original window on open, then sort and fade on close.
+Demo: ./demos/pixel-sort.gif
+Notes:
+- Uses a realtime luminance-driven column remap to emulate pixel sorting.
+- Open starts in a heavily sorted state and resolves back to the original image.
+- Close sorts the image into streaked columns while fading it away.
+*/
+```
+
+<img src="./demos/pixel-sort.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
 ## pop-drop
 
 ```c
