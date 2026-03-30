@@ -38,6 +38,24 @@ Demo: ./demos/blur.gif
 ---
 ---
 
+## chromatic_edge
+
+```c
+/*
+Shader: chromatic_edge
+Author: Justin Garza
+Desc: Expanding geometric mask with chromatic edge bloom and hue shift.
+Demo: ./demos/chromatic_edge.gif
+*/
+```
+
+<img src="./demos/chromatic_edge.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
 ## Dither-glitch
 
 ```c

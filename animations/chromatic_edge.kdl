@@ -1,0 +1,464 @@
+/*
+Shader: chromatic_edge
+Author: Justin Garza
+Desc: Expanding geometric mask with chromatic edge bloom and hue shift.
+Demo: ./demos/chromatic_edge.gif
+*/
+
+animations {
+
+    // Slow down all animations by this factor. Values below 1 speed them up instead.
+    slowdown 3.0
+
+    window-open {
+        duration-ms 300
+        //curve "linear"
+        //curve "cubic-bezier" 1.0 0.00 0.795 0.035
+        curve "cubic-bezier" 0.0 0.0 0.84 0.0
+
+        custom-shader r"
+
+float easeInSine(float t) {
+    return 1.0 - cos((t * 3.141592653589793) / 2.0);
+}
+
+float easeInExpo(float t) {
+    return t == 0.0 ? 0.0 : pow(2.0, 10.0 * (t - 1.0));
+}
+
+float easeOutExpo(float t) {
+    return t == 1.0 ? 1.0 : 1.0 - pow(2.0, -10.0 * t);
+}
+
+float easeInOutExpo(float t) {
+    if (t == 0.0) return 0.0;
+    if (t == 1.0) return 1.0;
+    return t < 0.5
+        ? 0.5 * pow(2.0, 20.0 * t - 10.0)
+        : 1.0 - 0.5 * pow(2.0, -20.0 * t + 10.0);
+}
+
+float remap(float value, float oldMin, float oldMax, float newMin, float newMax) {
+    return newMin + (value - oldMin) * (newMax - newMin) / (oldMax - oldMin);
+}
+
+
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+
+    // ==============================
+    // 🎛 USER CONTROLS
+    // ==============================
+
+    // Shape
+    float uShapePowerMin = 0.0;   // start shape softness
+    float uShapePowerMax = 50.0;  // end shape sharpness
+
+    // Edge
+    float uEdgeWidth = 1.0;       // overall edge thickness
+    float uEdgeIntensity = 1.0;   // brightness of edge
+
+    // Color
+    vec3  uColorPhase = vec3(0.0, 2.0, 4.0); // base RGB offsets (rainbow spacing)
+    
+/*
+| uColorStart | Resulting color vibe |
+| ----------- | -------------------- |
+| 0.0         | 🔴 Red-ish           |
+| ~1.0        | 🟠 Orange            |
+| ~2.0        | 🟢 Green             |
+| ~3.14       | 🔵 Cyan-ish          |
+| ~4.0        | 🔵 Blue              |
+| ~5.0        | 🟣 Purple            |
+| ~6.28       | 🔴 Red again         |
+*/    
+    float uColorStart = 2.0;                 // shifts starting color
+    float uColorSpeed = 6.28/2.0;                 // how fast colors animate
+
+    // UV distortion
+    float uAspectMix = 1.0; // 0 = distorted, 1 = normal
+
+    // ==============================
+    // 🧠 SHADER
+    // ==============================
+
+    float progress = niri_clamped_progress;
+
+    vec2 uv = coords_geo.xy;
+
+    // Aspect correction
+    float aspect = size_geo.x / size_geo.y;
+    vec2 tuv = uv;
+    tuv -= 0.5;
+    tuv.x *= aspect;
+    tuv += 0.5;
+
+    // Blend distortion
+    uv = mix(tuv, uv, easeOutExpo(progress) * uAspectMix);
+
+    // Base window texture
+    vec4 oColor = texture2D(niri_tex, coords_geo.st);
+
+    // Distance from center (diamond shape)
+    vec2 centerUV = abs(uv * 2.0 - vec2(1.0));
+
+    // Shape control
+    float p = mix(uShapePowerMin, uShapePowerMax, easeInSine(progress));
+    centerUV = pow(centerUV, vec2(p));
+
+    // Mask creation
+    float m = clamp(centerUV.x + centerUV.y, 0.0, 1.0);
+
+    float mask = (m > progress) ? 0.0 : 1.0;
+    float edge = abs(m - progress);
+
+    // Edge shaping
+    float e = mix(0.0, 1.0, 1.0 - progress);
+    edge = remap(edge, 0.0, e, 0.0, 1.0);
+    edge = clamp(edge, 0.0, 1.0);
+    edge = 1.0 - edge;
+
+    // Apply edge controls
+    edge *= uEdgeWidth;
+
+    // ==============================
+    // 🎨 COLOR
+    // ==============================
+
+    // Base cosine color
+    vec3 color = cos(
+        uv.xyx
+        + uColorPhase   // RGB spacing
+        + uColorStart   // starting color
+        + progress * uColorSpeed // animation speed
+    );
+
+    // ==============================
+    // 🧩 FINAL COMPOSE
+    // ==============================
+
+    float mask0 = mask;
+    float mask1 = edge * mask;
+
+    vec4 result =
+        (oColor * mask0)
+        + (mask1 * vec4(color * uEdgeIntensity, 1.0));
+
+    return result;
+}
+"
+  }
+
+    window-close {
+        duration-ms 300
+        //curve "linear"
+        //curve "ease-out-expo"
+        curve "cubic-bezier" 0.0 0.0 0.0 0.84
+
+        custom-shader r"
+
+float easeInSine(float t) {
+    return 1.0 - cos((t * 3.141592653589793) / 2.0);
+}
+
+float easeInExpo(float t) {
+    return t == 0.0 ? 0.0 : pow(2.0, 10.0 * (t - 1.0));
+}
+
+float easeOutExpo(float t) {
+    return t == 1.0 ? 1.0 : 1.0 - pow(2.0, -10.0 * t);
+}
+
+float easeInOutExpo(float t) {
+    if (t == 0.0) return 0.0;
+    if (t == 1.0) return 1.0;
+    return t < 0.5
+        ? 0.5 * pow(2.0, 20.0 * t - 10.0)
+        : 1.0 - 0.5 * pow(2.0, -20.0 * t + 10.0);
+}
+
+float remap(float value, float oldMin, float oldMax, float newMin, float newMax) {
+    return newMin + (value - oldMin) * (newMax - newMin) / (oldMax - oldMin);
+}
+
+
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+
+    // ==============================
+    // 🎛 USER CONTROLS
+    // ==============================
+
+    // Shape
+    float uShapePowerMin = 0.0;   // start shape softness
+    float uShapePowerMax = 50.0;  // end shape sharpness
+
+    // Edge
+    float uEdgeWidth = 1.0;       // overall edge thickness
+    float uEdgeIntensity = 1.0;   // brightness of edge
+
+    // Color
+    vec3  uColorPhase = vec3(0.0, 2.0, 4.0); // base RGB offsets (rainbow spacing)
+    
+/*
+| uColorStart | Resulting color vibe |
+| ----------- | -------------------- |
+| 0.0         | 🔴 Red-ish           |
+| ~1.0        | 🟠 Orange            |
+| ~2.0        | 🟢 Green             |
+| ~3.14       | 🔵 Cyan-ish          |
+| ~4.0        | 🔵 Blue              |
+| ~5.0        | 🟣 Purple            |
+| ~6.28       | 🔴 Red again         |
+*/    
+    float uColorStart = 2.0;                 // shifts starting color
+    float uColorSpeed = -6.28/2.0;                 // how fast colors animate
+
+    // UV distortion
+    float uAspectMix = 1.0; // 0 = distorted, 1 = normal
+
+    // ==============================
+    // 🧠 SHADER
+    // ==============================
+
+    float progress = 1.0 - niri_clamped_progress;
+
+    vec2 uv = coords_geo.xy;
+
+    // Aspect correction
+    float aspect = size_geo.x / size_geo.y;
+    vec2 tuv = uv;
+    tuv -= 0.5;
+    tuv.x *= aspect;
+    tuv += 0.5;
+
+    // Blend distortion
+    uv = mix(tuv, uv, easeOutExpo(progress) * uAspectMix);
+
+    // Base window texture
+    vec4 oColor = texture2D(niri_tex, coords_geo.st);
+
+    // Distance from center (diamond shape)
+    vec2 centerUV = abs(uv * 2.0 - vec2(1.0));
+
+    // Shape control
+    float p = mix(uShapePowerMin, uShapePowerMax, easeInSine(progress));
+    centerUV = pow(centerUV, vec2(p));
+
+    // Mask creation
+    float m = clamp(centerUV.x + centerUV.y, 0.0, 1.0);
+
+    float mask = (m > progress) ? 0.0 : 1.0;
+    float edge = abs(m - progress);
+
+    // Edge shaping
+    float e = mix(0.0, 1.0, 1.0 - progress);
+    edge = remap(edge, 0.0, e, 0.0, 1.0);
+    edge = clamp(edge, 0.0, 1.0);
+    edge = 1.0 - edge;
+
+    // Apply edge controls
+    edge *= uEdgeWidth;
+
+    // ==============================
+    // 🎨 COLOR
+    // ==============================
+
+    // Base cosine color
+    vec3 color = cos(
+        uv.xyx
+        + uColorPhase   // RGB spacing
+        + uColorStart   // starting color
+        + progress * uColorSpeed // animation speed
+    );
+
+    // ==============================
+    // 🧩 FINAL COMPOSE
+    // ==============================
+
+    float mask0 = mask;
+    float mask1 = edge * mask;
+
+    vec4 result =
+        (oColor * mask0)
+        + (mask1 * vec4(color * uEdgeIntensity, 1.0));
+
+    return result;
+}    
+"
+    }
+
+
+    window-resize {
+        duration-ms 300
+        curve "linear"
+        //curve "cubic-bezier" 0.95 0.05 0.795 0.035
+
+        custom-shader r"
+float easeInSine(float t) {
+    return 1.0 - cos((t * 3.141592653589793) / 2.0);
+}
+
+float easeInExpo(float t) {
+    return t == 0.0 ? 0.0 : pow(2.0, 10.0 * (t - 1.0));
+}
+
+float easeOutExpo(float t) {
+    return t == 1.0 ? 1.0 : 1.0 - pow(2.0, -10.0 * t);
+}
+
+float easeInOutExpo(float t) {
+    if (t == 0.0) return 0.0;
+    if (t == 1.0) return 1.0;
+    return t < 0.5
+        ? 0.5 * pow(2.0, 20.0 * t - 10.0)
+        : 1.0 - 0.5 * pow(2.0, -20.0 * t + 10.0);
+}
+
+float remap(float value, float oldMin, float oldMax, float newMin, float newMax) {
+    return newMin + (value - oldMin) * (newMax - newMin) / (oldMax - oldMin);
+}
+
+vec3 offsetHue(vec3 color, float hueOffset) {
+    float maxC = max(max(color.r, color.g), color.b);
+    float minC = min(min(color.r, color.g), color.b);
+    float delta = maxC - minC;
+
+    float hue = 0.0;
+    if (delta > 0.0) {
+        if (maxC == color.r) hue = mod((color.g - color.b) / delta, 6.0);
+        else if (maxC == color.g) hue = (color.b - color.r) / delta + 2.0;
+        else hue = (color.r - color.g) / delta + 4.0;
+    }
+    hue /= 6.0;
+
+    float saturation = (maxC > 0.0) ? (delta / maxC) : 0.0;
+    float value = maxC;
+
+    hue = mod(hue + hueOffset, 1.0);
+
+    float c = value * saturation;
+    float x = c * (1.0 - abs(mod(hue * 6.0, 2.0) - 1.0));
+    float m = value - c;
+
+    vec3 rgb;
+    if (hue < 1.0/6.0) rgb = vec3(c,x,0.0);
+    else if (hue < 2.0/6.0) rgb = vec3(x,c,0.0);
+    else if (hue < 3.0/6.0) rgb = vec3(0.0,c,x);
+    else if (hue < 4.0/6.0) rgb = vec3(0.0,x,c);
+    else if (hue < 5.0/6.0) rgb = vec3(x,0.0,c);
+    else rgb = vec3(c,0.0,x);
+
+    return rgb + m;
+}
+
+vec4 resize_color(vec3 coords_geo, vec3 size_geo) {
+
+    // ==============================
+    // 🎛 USER CONTROLS
+    // ==============================
+
+    // Color
+    vec3  uColorPhase = vec3(0.0, 2.0, 4.0); // base RGB offsets (rainbow spacing)
+    
+/*
+| uColorStart | Resulting color vibe |
+| ----------- | -------------------- |
+| 0.0         | 🔴 Red-ish           |
+| ~1.0        | 🟠 Orange            |
+| ~2.0        | 🟢 Green             |
+| ~3.14       | 🔵 Cyan-ish          |
+| ~4.0        | 🔵 Blue              |
+| ~5.0        | 🟣 Purple            |
+| ~6.28       | 🔴 Red again         |
+*/    
+    float uColorStart = 2.0;                 // shifts starting color
+    float uColorSpeed = 6.28;                 // how fast colors animate
+
+    // ==============================
+    // 🧠 SHADER
+    // ==============================
+
+    float progress = easeInSine (sin( niri_clamped_progress * 3.14 ));
+    // this moves from Zero to One and back to Zero
+
+    vec2 uv = coords_geo.xy;
+
+    // Base window texture
+    vec4 oColor = texture2D(niri_tex_next, coords_geo.st );
+
+
+    // ==============================
+    // 🎨 COLOR
+    // ==============================
+
+    // Base cosine color
+    vec4 color = vec4(
+        cos(
+            uv.xyx
+            + uColorPhase   // RGB spacing
+            + uColorStart   // starting color
+            + progress * uColorSpeed // animation speed
+        ),
+        1.0
+    );
+
+    // ==============================
+    // 🧩 FINAL COMPOSE
+    // ==============================
+
+    color *= progress * 0.1;
+    //                   ^ how much color we are gonna add
+    color.a = 1.0;
+    return oColor + color;
+
+}
+        "
+
+    }
+
+
+
+
+// ***animations below do not use a shaders ***
+// these are not required
+
+
+    workspace-switch {
+        // Smooth, composed, no bounce.
+        spring damping-ratio=1.0 stiffness=760 epsilon=0.0001
+    }
+    
+    horizontal-view-movement {
+        // Main "camera glide" for scrollable movement.
+        spring damping-ratio=1.0 stiffness=640 epsilon=0.0001
+    }
+
+    window-movement {
+        // Individual windows shift with a slightly tighter response
+        // than the camera, so it feels organized.
+        spring damping-ratio=1.0 stiffness=700 epsilon=0.0001
+    }
+
+    config-notification-open-close {
+        // Less playful, more refined than the default underdamped feel.
+        spring damping-ratio=1.0 stiffness=820 epsilon=0.001
+    }
+
+    exit-confirmation-open-close {
+        spring damping-ratio=1.0 stiffness=560 epsilon=0.01
+    }
+
+    screenshot-ui-open {
+        duration-ms 220
+        curve "cubic-bezier" 0.22 1.0 0.36 1.0
+    }
+
+    overview-open-close {
+        // Overview should feel smooth and premium, not springy/bouncy.
+        spring damping-ratio=1.0 stiffness=620 epsilon=0.0001
+    }
+
+    recent-windows-close {
+        spring damping-ratio=1.0 stiffness=680 epsilon=0.001
+    }
+
+}
