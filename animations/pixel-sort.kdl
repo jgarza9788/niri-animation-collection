@@ -1,0 +1,219 @@
+/*
+Title: pixel-sort
+Authors: Joe Hsu<jhsu.x1@gmail.com
+Desc: Reverse pixel-sort into the original window on open, then sort and fade on close.
+Demo: ./demos/pixel-sort.gif
+Notes:
+- Uses a realtime luminance-driven column remap to emulate pixel sorting.
+- Open starts in a heavily sorted state and resolves back to the original image.
+- Close sorts the image into streaked columns while fading it away.
+*/
+
+
+animations {
+    window-open {
+        duration-ms 1200
+        curve "ease-out-cubic"
+
+        custom-shader r"
+float saturate(float x) {
+    return clamp(x, 0.0, 1.0);
+}
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float luma(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+const int SORT_SAMPLES = 40;
+
+float stagger_phase(float x, float seed) {
+    float group_a = hash(vec2(floor(x * 48.0), seed));
+    float group_b = hash(vec2(floor(x * 113.0) + 17.0, seed * 1.37));
+    float mixed = mix(group_a, group_b, 0.55);
+    return clamp(0.22 + mixed * 0.42, 0.0, 1.0);
+}
+
+vec4 sample_column(vec2 uv) {
+    vec2 tex_uv = (niri_geo_to_tex * vec3(uv, 1.0)).st;
+    return texture2D(niri_tex, tex_uv);
+}
+
+float best_match_y(float pixel_x, float target_luma, float phase_bias) {
+    float best_y = 0.0;
+    float best_dist = 9999.0;
+    for (int i = 0; i < SORT_SAMPLES; i++) {
+        float sample_y = (float(i) + 0.5) / float(SORT_SAMPLES);
+        vec4 sample_color = sample_column(vec2(pixel_x, sample_y));
+        float sample_luma = luma(sample_color.rgb);
+        float dist = abs(sample_luma - target_luma);
+        dist += abs(sample_y - phase_bias) * 0.015;
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_y = sample_y;
+        }
+    }
+    return best_y;
+}
+
+vec4 sample_sorted(vec3 coords_geo, vec3 size_geo, float progress, bool opening) {
+    if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+        coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+        return vec4(0.0);
+    }
+
+    vec2 uv = coords_geo.xy;
+    float pixel_cols = max(size_geo.x, 1.0);
+    float pixel_x = (floor(uv.x * pixel_cols) + 0.5) / pixel_cols;
+    vec2 base_uv = vec2(pixel_x, uv.y);
+    vec4 base = sample_column(base_uv);
+
+    float seed = floor(niri_random_seed * 1000.0);
+    float phase = stagger_phase(pixel_x, seed);
+    float local = opening
+        ? 1.0 - smoothstep(phase * 0.38, min(phase * 0.38 + 0.58, 1.0), progress)
+        : smoothstep(phase * 0.34, min(phase * 0.34 + 0.54, 1.0), progress);
+
+    float direction_bias = hash(vec2(pixel_x * 4096.0, seed)) > 0.5 ? 1.0 : -1.0;
+    float target_luma = clamp(uv.y + direction_bias * (phase - 0.5) * 0.04, 0.0, 1.0);
+    float sorted_y = best_match_y(pixel_x, target_luma, phase);
+    vec4 sorted = sample_column(vec2(pixel_x, sorted_y));
+    float contrast = abs(luma(sorted.rgb) - luma(base.rgb));
+    float blend = local * (0.82 + 0.18 * smoothstep(0.05, 0.35, contrast));
+    vec3 color = mix(base.rgb, sorted.rgb, blend);
+
+    float fade = opening ? saturate(0.15 + (1.15 - local)) : (1.0 - local * 0.92);
+    float alpha = base.a * fade;
+
+    return vec4(color, alpha);
+}
+
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    return sample_sorted(coords_geo, size_geo, p, true);
+}
+        "
+    }
+
+    window-close {
+        duration-ms 240
+        curve "linear"
+
+        custom-shader r"
+float saturate(float x) {
+    return clamp(x, 0.0, 1.0);
+}
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float luma(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+const int SORT_SAMPLES = 40;
+
+float stagger_phase(float x, float seed) {
+    float group_a = hash(vec2(floor(x * 48.0), seed));
+    float group_b = hash(vec2(floor(x * 113.0) + 17.0, seed * 1.37));
+    float mixed = mix(group_a, group_b, 0.55);
+    return clamp(0.22 + mixed * 0.42, 0.0, 1.0);
+}
+
+vec4 sample_column(vec2 uv) {
+    vec2 tex_uv = (niri_geo_to_tex * vec3(uv, 1.0)).st;
+    return texture2D(niri_tex, tex_uv);
+}
+
+float best_match_y(float pixel_x, float target_luma, float phase_bias) {
+    float best_y = 0.0;
+    float best_dist = 9999.0;
+    for (int i = 0; i < SORT_SAMPLES; i++) {
+        float sample_y = (float(i) + 0.5) / float(SORT_SAMPLES);
+        vec4 sample_color = sample_column(vec2(pixel_x, sample_y));
+        float sample_luma = luma(sample_color.rgb);
+        float dist = abs(sample_luma - target_luma);
+        dist += abs(sample_y - phase_bias) * 0.015;
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_y = sample_y;
+        }
+    }
+    return best_y;
+}
+
+vec4 sample_sorted(vec3 coords_geo, vec3 size_geo, float progress, bool opening) {
+    if (coords_geo.x < 0.0 || coords_geo.x > 1.0 ||
+        coords_geo.y < 0.0 || coords_geo.y > 1.0) {
+        return vec4(0.0);
+    }
+
+    vec2 uv = coords_geo.xy;
+    float pixel_cols = max(size_geo.x, 1.0);
+    float pixel_x = (floor(uv.x * pixel_cols) + 0.5) / pixel_cols;
+    vec2 base_uv = vec2(pixel_x, uv.y);
+    vec4 base = sample_column(base_uv);
+
+    float seed = floor(niri_random_seed * 1000.0);
+    float phase = stagger_phase(pixel_x, seed);
+    float local = opening
+        ? 1.0 - smoothstep(phase * 0.38, min(phase * 0.38 + 0.58, 1.0), progress)
+        : smoothstep(phase * 0.34, min(phase * 0.34 + 0.54, 1.0), progress);
+
+    float direction_bias = hash(vec2(pixel_x * 4096.0, seed)) > 0.5 ? 1.0 : -1.0;
+    float target_luma = clamp(uv.y + direction_bias * (phase - 0.5) * 0.04, 0.0, 1.0);
+    float sorted_y = best_match_y(pixel_x, target_luma, phase);
+    vec4 sorted = sample_column(vec2(pixel_x, sorted_y));
+    float contrast = abs(luma(sorted.rgb) - luma(base.rgb));
+    float blend = local * (0.82 + 0.18 * smoothstep(0.05, 0.35, contrast));
+    vec3 color = mix(base.rgb, sorted.rgb, blend);
+
+    float fade = opening ? saturate(0.15 + (1.15 - local)) : (1.0 - local * 0.92);
+    float alpha = base.a * fade;
+
+    return vec4(color, alpha);
+}
+
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    vec2 uv = coords_geo.xy;
+    float seed = floor(niri_random_seed * 1000.0);
+    float pixel_cols = max(size_geo.x, 1.0);
+    float pixel_x = (floor(uv.x * pixel_cols) + 0.5) / pixel_cols;
+    float col_id = floor(uv.x * pixel_cols);
+
+    float strip_width = 2.0 + floor(hash(vec2(col_id * 0.11, seed + 2.0)) * 7.0);
+    float strip_id = floor(col_id / strip_width);
+    float strip_noise = hash(vec2(strip_id, seed + 11.0));
+    float strip_pick = step(0.58, strip_noise);
+
+    float start_t = strip_noise * 0.42;
+    float local_t = clamp((p - start_t) / max(1.0 - start_t, 0.001), 0.0, 1.0);
+    float gravity = local_t * local_t * (0.18 + 1.25 * strip_noise);
+    float wobble = (hash(vec2(strip_id * 3.17, seed + 29.0)) - 0.5) * 0.012 * local_t;
+
+    vec2 drop_uv = vec2(pixel_x + wobble, uv.y - gravity);
+    vec4 dropped = sample_column(drop_uv);
+    vec4 base = sample_column(vec2(pixel_x, uv.y));
+
+    float shard_tail = smoothstep(0.0, 0.22, uv.y + gravity) * (1.0 - smoothstep(0.22, 0.95, uv.y + gravity));
+    float shard_alpha = (1.0 - local_t * 0.82) * (1.0 - gravity * 0.35) * (0.72 + 0.28 * shard_tail);
+
+    float ambient_noise = hash(floor(vec2(uv.x * pixel_cols, uv.y * 140.0)) + vec2(floor(p * 24.0), seed));
+    float ambient_dissolve = 1.0 - smoothstep(0.22, 1.0, p * 0.82 + ambient_noise * 0.26 + (1.0 - uv.y) * 0.18);
+
+    vec4 color = mix(base, dropped, strip_pick);
+    float alpha = mix(base.a * ambient_dissolve, dropped.a * shard_alpha, strip_pick);
+
+    color.rgb *= 1.0 - p * 0.22;
+    color.a = alpha * (1.0 - p * 0.55);
+
+    return color;
+}
+        "
+    }
+}
