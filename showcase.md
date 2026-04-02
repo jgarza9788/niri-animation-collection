@@ -191,6 +191,24 @@ Demo: ./demos/incinerate.gif
 ---
 ---
 
+## mushroom
+
+```c
+/*
+Title: mushroom
+Author: Justin Garza
+Desc: just like that ol' 8bit pumber
+Demo: ./demos/mushroom.gif
+*/
+```
+
+<img src="./demos/mushroom.gif" alt="demo_gif" height="300">
+
+
+---
+---
+---
+
 ## pixelate
 
 ```c
